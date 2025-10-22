@@ -1063,9 +1063,6 @@ def main():
         st.error("❌ Tidak dapat memuat data. Periksa URL dan nama sheet.")
         return
     
-    # Update sidebar with loaded data
-    config.update(render_sidebar(df))
-    
     # Apply filters
     filtered_df = filter_data(df, config)
     
