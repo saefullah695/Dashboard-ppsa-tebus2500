@@ -1063,7 +1063,7 @@ with tabs[0]:
     
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     st.plotly_chart(create_cashier_performance_chart(filtered_df), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Tambahkan detail perhitungan score
     with st.expander("📋 Detail Perhitungan Score PPSA", expanded=False):
