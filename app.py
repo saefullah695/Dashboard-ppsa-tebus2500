@@ -809,48 +809,6 @@ def generate_ai_insights(df: pd.DataFrame, model) -> str:
 
 
 # =========================================================
-# ------------------- FUNGSI PERHITUNGAN SCORE PPSA --------------------
-# =========================================================
-def calculate_ppsa_score(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Menghitung PPSA score dengan bobot yang benar sesuai script asli:
-    - PSM bobot 20%
-    - PWP bobot 25%
-    - SG bobot 30%
-    - APC bobot 25%
-    """
-    # Buat copy dataframe untuk menghindari SettingWithCopyWarning
-    df_calc = df.copy()
-    
-    # Konversi kolom ACV ke numerik
-    indicators = ['PSM', 'PWP', 'SG', 'APC']
-    
-    for indicator in indicators:
-        acv_col = f'{indicator} ACV'
-        if acv_col in df_calc.columns:
-            # Konversi nilai ACV ke numerik
-            df_calc[acv_col] = df_calc[acv_col].astype(str).str.replace('%', '').str.replace(',', '.')
-            df_calc[acv_col] = pd.to_numeric(df_calc[acv_col], errors='coerce')
-            
-            # Hitung score per indikator dengan bobot yang sesuai
-            if indicator == 'PSM':
-                df_calc[f'{indicator} SCORE'] = (df_calc[acv_col] * 20) / 100
-            elif indicator == 'PWP':
-                df_calc[f'{indicator} SCORE'] = (df_calc[acv_col] * 25) / 100
-            elif indicator == 'SG':
-                df_calc[f'{indicator} SCORE'] = (df_calc[acv_col] * 30) / 100
-            elif indicator == 'APC':
-                df_calc[f'{indicator} SCORE'] = (df_calc[acv_col] * 25) / 100
-    
-    # Hitung total score PPSA
-    score_cols = [f'{indicator} SCORE' for indicator in indicators if f'{indicator} SCORE' in df_calc.columns]
-    if score_cols:
-        df_calc['TOTAL SCORE PPSA'] = df_calc[score_cols].sum(axis=1)
-    
-    return df_calc
-
-
-# =========================================================
 # ----------------------- SIDEBAR -------------------------
 # =========================================================
 with st.sidebar:
@@ -916,9 +874,6 @@ if dataframe is None or dataframe.empty:
 # Initialize Gemini model
 gemini_model = configure_gemini()
 
-# Hitung PPSA score dengan bobot yang benar
-dataframe_with_scores = calculate_ppsa_score(dataframe)
-
 # Tambahkan filter setelah data dimuat
 with st.sidebar:
     st.subheader("🧮 Filter")
@@ -967,7 +922,7 @@ with st.sidebar:
 
 # Filter data
 filtered_df = filter_dataframe(
-    dataframe_with_scores,
+    dataframe,
     date_range=selected_date_range,
     selected_cashiers=selected_cashiers,
     selected_shifts=selected_shifts
@@ -982,7 +937,7 @@ if filtered_df.empty:
 # =========================================================
 st.subheader("🔑 Ringkasan Eksekutif")
 
-# Hitung metrik PPSA dengan score yang benar
+# Hitung metrik PPSA
 total_score = 0
 avg_score = 0
 if 'TOTAL SCORE PPSA' in filtered_df.columns:
@@ -1064,48 +1019,6 @@ with tabs[0]:
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     st.plotly_chart(create_cashier_performance_chart(filtered_df), use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Tambahkan detail perhitungan score
-    with st.expander("📋 Detail Perhitungan Score PPSA", expanded=False):
-        st.markdown("""
-        ### 📋 Formula Perhitungan Score PPSA
-        
-        **Bobot Indikator:**
-        - PSM: 20%
-        - PWP: 25%
-        - SG: 30%
-        - APC: 25%
-        
-        **Formula:**
-        - Score PSM = (%ACV PSM × 20) ÷ 100
-        - Score PWP = (%ACV PWP × 25) ÷ 100
-        - Score SG = (%ACV SG × 30) ÷ 100
-        - Score APC = (%ACV APC × 25) ÷ 100
-        - Total Score = Score PSM + Score PWP + Score SG + Score APC
-        """)
-        
-        # Tampilkan detail score per indikator
-        indicators = ['PSM', 'PWP', 'SG', 'APC']
-        score_data = []
-        
-        for indicator in indicators:
-            acv_col = f'{indicator} ACV'
-            score_col = f'{indicator} SCORE'
-            
-            if acv_col in filtered_df.columns and score_col in filtered_df.columns:
-                avg_acv = filtered_df[acv_col].mean()
-                avg_score = filtered_df[score_col].mean()
-                
-                score_data.append({
-                    'Indikator': indicator,
-                    'Rata-rata ACV (%)': f"{avg_acv:.2f}",
-                    'Rata-rata Score': f"{avg_score:.2f}",
-                    'Bobot (%)': f"{20 if indicator == 'PSM' else 25 if indicator == 'PWP' else 30 if indicator == 'SG' else 25}%"
-                })
-        
-        if score_data:
-            score_detail_df = pd.DataFrame(score_data)
-            st.dataframe(score_detail_df, use_container_width=True, hide_index=True)
 
 with tabs[1]:
     st.subheader("💰 Analisis Tebus Murah")
