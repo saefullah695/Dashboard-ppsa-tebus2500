@@ -7,495 +7,603 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 import numpy as np
 from scipy import stats
 from plotly.subplots import make_subplots
 import google.generativeai as genai
 import re
+import json
+from io import BytesIO
+import base64
 
 # =========================================================
 # ------------------- KONFIGURASI AWAL --------------------
 # =========================================================
 st.set_page_config(
-    page_title="Dashboard PPSA & Tebus Murah",
-    page_icon="📊",
+    page_title="Dashboard PPSA & Tebus Murah 2025",
+    page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Palet warna kekinian
-COLOR_PRIMARY = "#6366F1"     # Indigo neon
-COLOR_ACCENT = "#22D3EE"      # Cyan terang
-COLOR_SUCCESS = "#34D399"     # Hijau pastel
-COLOR_WARNING = "#FACC15"     # Kuning keemasan
-COLOR_DANGER = "#F97316"      # Oranye sunset
-COLOR_NEGATIVE = "#FB7185"    # Merah salmon
-COLOR_BG = "#0F172A"          # Biru gelap
-COLOR_CARD = "rgba(15, 23, 42, 0.65)"
-COLOR_BORDER = "rgba(148, 163, 184, 0.28)"
+# BOBOT PPSA - Sesuaikan dengan ketentuan perusahaan
+PPSA_WEIGHTS = {
+    'PSM': 0.25,   # 25%
+    'PWP': 0.30,   # 30%
+    'SG': 0.25,    # 25%
+    'APC': 0.20    # 20%
+}
 
-PLOTLY_COLORWAY = [
-    "#6366F1", "#22D3EE", "#34D399", "#F97316",
-    "#FACC15", "#A855F7", "#38BDF8", "#FB7185", "#F472B6"
-]
+# Palet warna modern 2025
+COLOR_SCHEME = {
+    'primary': '#6366F1',      # Indigo modern
+    'secondary': '#06B6D4',    # Cyan vibrant
+    'success': '#10B981',      # Emerald
+    'warning': '#F59E0B',      # Amber
+    'danger': '#EF4444',       # Red
+    'info': '#8B5CF6',         # Violet
+    'accent': '#EC4899',       # Pink
+    'dark': '#0F172A',         # Slate 900
+    'light': '#F8FAFC',        # Slate 50
+    'muted': '#64748B'         # Slate 500
+}
 
-CUSTOM_CSS = """
+PLOTLY_COLORS = list(COLOR_SCHEME.values())
+
+# CSS Modern dengan Advanced Animations
+MODERN_CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-    --color-primary: #6366F1;
-    --color-accent: #22D3EE;
-    --color-success: #34D399;
-    --color-warning: #FACC15;
-    --color-danger: #F97316;
-    --color-negative: #FB7185;
-    --color-bg: #0F172A;
-    --color-bg-secondary: rgba(15, 23, 42, 0.75);
-    --color-card: rgba(15, 23, 42, 0.65);
-    --color-border: rgba(148, 163, 184, 0.28);
-    --color-text: #E2E8F0;
-    --color-text-muted: #94A3B8;
-    --color-highlight: rgba(99, 102, 241, 0.22);
-    --radius: 20px;
-    --blur: 22px;
-    --transition: 0.25s ease;
+    --primary: #6366F1;
+    --secondary: #06B6D4;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --info: #8B5CF6;
+    --accent: #EC4899;
+    --dark: #0F172A;
+    --light: #F8FAFC;
+    --muted: #64748B;
+    --glass-bg: rgba(15, 23, 42, 0.75);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --blur: 20px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
-    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    color: var(--color-text);
-    background: radial-gradient(circle at top left, rgba(99,102,241,0.18), transparent 55%),
-                radial-gradient(circle at top right, rgba(34,211,238,0.18), transparent 55%),
-                radial-gradient(circle at bottom, rgba(251,113,133,0.18), transparent 55%),
-                var(--color-bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    background: linear-gradient(135deg, 
+        rgba(99, 102, 241, 0.1) 0%, 
+        rgba(6, 182, 212, 0.1) 25%,
+        rgba(16, 185, 129, 0.1) 50%,
+        rgba(236, 72, 153, 0.1) 75%,
+        rgba(139, 92, 246, 0.1) 100%),
+        var(--dark);
+    color: var(--light);
+    min-height: 100vh;
 }
 
 [data-testid="stAppViewContainer"] {
     background: transparent;
 }
 
-section.main > div {
-    padding-top: 1.2rem;
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 100%;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    color: var(--color-text) !important;
-    letter-spacing: 0.01em;
-}
-
-.stTabs [role="tablist"] {
-    gap: 0.75rem;
-}
-
-.stTabs [role="tab"] {
-    padding: 0.85rem 1.35rem;
-    background: rgba(99, 102, 241, 0.08);
-    border-radius: var(--radius);
-    border: 1px solid transparent;
-    transition: var(--transition);
-    color: var(--color-text-muted);
-    font-weight: 600;
-}
-
-.stTabs [role="tab"]:hover {
-    border-color: rgba(34, 211, 238, 0.4);
-    color: var(--color-accent);
-}
-
-.stTabs [aria-selected="true"] {
-    background: var(--color-card);
-    border-color: rgba(99, 102, 241, 0.55);
-    color: var(--color-text);
-    box-shadow: 0 12px 30px -12px rgba(99, 102, 241, 0.6);
-}
-
-[data-testid="stSidebar"] {
-    background: rgba(15, 23, 42, 0.85);
-    border-right: 1px solid var(--color-border);
+/* Modern Header */
+.hero-section {
+    background: linear-gradient(135deg, 
+        rgba(99, 102, 241, 0.2) 0%, 
+        rgba(6, 182, 212, 0.2) 100%);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid var(--glass-border);
     backdrop-filter: blur(var(--blur));
+    position: relative;
+    overflow: hidden;
 }
 
-[data-testid="stSidebar"] * {
-    color: var(--color-text);
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, var(--secondary), transparent);
+    opacity: 0.3;
+    animation: float 6s ease-in-out infinite;
 }
 
-.stButton button, .stDownloadButton button {
-    border-radius: 999px !important;
-    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(34,211,238,0.15));
-    color: var(--color-text);
-    border: 1px solid rgba(99,102,241,0.35);
-    transition: var(--transition);
-    font-weight: 600;
-    letter-spacing: 0.03em;
+@keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(180deg); }
 }
 
-.stButton button:hover, .stDownloadButton button:hover {
-    border-color: rgba(34,211,238,0.55);
-    background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(34,211,238,0.25));
-    box-shadow: 0 12px 30px -14px rgba(34, 211, 238, 0.65);
+.hero-title {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1rem;
 }
 
-.metric-grid {
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: var(--muted);
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+/* Modern Metrics Grid */
+.metrics-grid {
     display: grid;
-    gap: 1.2rem;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
 }
 
 .metric-card {
-    background: linear-gradient(160deg, rgba(99,102,241,0.16), rgba(15,23,42,0.6));
-    border-radius: var(--radius);
-    padding: 1.4rem 1.6rem;
-    border: 1px solid var(--color-border);
+    background: var(--glass-bg);
     backdrop-filter: blur(var(--blur));
-    box-shadow: 0 20px 45px -25px rgba(15, 23, 42, 0.9);
-    transition: var(--transition);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid var(--glass-border);
     position: relative;
     overflow: hidden;
-}
-
-.metric-card::after {
-    content: "";
-    position: absolute;
-    inset: -40% 30% auto auto;
-    width: 180px;
-    height: 180px;
-    background: radial-gradient(circle, rgba(34, 211, 238, 0.28) 0%, transparent 60%);
-    transform: rotate(35deg);
-    opacity: 0.9;
+    transition: var(--transition);
+    cursor: pointer;
 }
 
 .metric-card:hover {
-    transform: translateY(-6px);
-    border-color: rgba(34, 211, 238, 0.55);
-    box-shadow: 0 24px 55px -28px rgba(34, 211, 238, 0.55);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
 }
 
-.metric-card .metric-icon {
-    font-size: 1.8rem;
-    margin-bottom: 0.35rem;
-}
-
-.metric-card .metric-label {
-    font-size: 0.78rem;
-    letter-spacing: 0.26em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-    margin-bottom: 0.25rem;
-}
-
-.metric-card .metric-value {
-    font-size: clamp(1.75rem, 3vw, 2.45rem);
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0.15rem 0 0.5rem;
-}
-
-.metric-card .metric-delta {
-    display: inline-flex;
-    gap: 0.4rem;
-    align-items: center;
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-.delta-positive { color: var(--color-success); }
-.delta-negative { color: var(--color-negative); }
-.delta-neutral { color: var(--color-warning); }
-
-.hero-card {
-    background: linear-gradient(135deg, rgba(99,102,241,0.32), rgba(37,99,235,0.18));
-    border-radius: calc(var(--radius) * 1.1);
-    border: 1px solid rgba(99, 102, 241, 0.38);
-    padding: 1.6rem 1.8rem;
-    margin-bottom: 1.8rem;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 28px 60px -32px rgba(99, 102, 241, 0.65);
-}
-
-.hero-card::before {
-    content: "";
+.metric-card::before {
+    content: '';
     position: absolute;
-    inset: 12% -25% auto auto;
-    width: 260px;
-    height: 260px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(34,211,238,0.35), transparent 65%);
-    filter: blur(2px);
-    opacity: 0.65;
-    animation: pulseGlow 6s ease-in-out infinite alternate;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: 20px 20px 0 0;
 }
 
-@keyframes pulseGlow {
-    from { transform: scale(0.95); opacity: 0.55; }
-    to { transform: scale(1.08); opacity: 0.85; }
-}
-
-.hero-card h1 {
-    font-size: clamp(2rem, 3.5vw, 2.8rem);
-    margin-bottom: 0.6rem;
-}
-
-.hero-card p {
-    color: var(--color-text-muted);
-    font-size: 1.02rem;
-    max-width: 62ch;
-    line-height: 1.65;
-}
-
-.insight-card {
-    background: var(--color-card);
-    border-radius: var(--radius);
-    border: 1px solid rgba(99,102,241,0.28);
-    padding: 1.2rem 1.35rem;
-    backdrop-filter: blur(var(--blur));
-    position: relative;
-    overflow: hidden;
-    transition: var(--transition);
-}
-
-.insight-card::after {
-    content: "";
-    position: absolute;
-    inset: 65% -30% auto auto;
-    width: 160px;
-    height: 160px;
-    background: radial-gradient(circle, rgba(99,102,241,0.22), transparent 65%);
-    opacity: 0.55;
-}
-
-.insight-card strong {
-    color: var(--color-accent);
-}
-
-.stDataFrame {
-    border-radius: calc(var(--radius) * 0.9);
-    border: 1px solid rgba(99,102,241,0.18);
-    overflow: hidden;
-}
-
-[data-testid="stDataFrame"] div[role="table"] {
-    border-radius: 0;
-}
-
-.chart-container {
-    background: var(--color-card);
-    border-radius: var(--radius);
-    border: 1px solid var(--color-border);
-    padding: 1.2rem;
-    margin-bottom: 1.5rem;
-    backdrop-filter: blur(var(--blur));
-    box-shadow: 0 20px 45px -25px rgba(15, 23, 42, 0.9);
-}
-
-.ai-response {
-    background: linear-gradient(160deg, rgba(34,211,238,0.12), rgba(15,23,42,0.6));
-    border-radius: var(--radius);
-    border: 1px solid rgba(34,211,238,0.28);
-    padding: 1.2rem;
+.metric-icon {
+    font-size: 2.5rem;
     margin-bottom: 1rem;
-    backdrop-filter: blur(var(--blur));
+    display: block;
 }
 
-.ai-response h4 {
-    color: var(--color-accent);
+.metric-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin-bottom: 0.5rem;
 }
 
-.ai-response p {
-    color: var(--color-text);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin-bottom: 0;
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--light);
+    margin-bottom: 0.5rem;
+    line-height: 1;
 }
 
+.metric-delta {
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.delta-positive { color: var(--success); }
+.delta-negative { color: var(--danger); }
+.delta-neutral { color: var(--warning); }
+
+/* Modern Tabs */
+.stTabs [role="tablist"] {
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--glass-border);
+    padding-bottom: 0;
+}
+
+.stTabs [role="tab"] {
+    background: transparent;
+    border: none;
+    border-radius: 12px 12px 0 0;
+    padding: 1rem 2rem;
+    font-weight: 600;
+    color: var(--muted);
+    transition: var(--transition);
+    position: relative;
+}
+
+.stTabs [role="tab"]:hover {
+    color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.stTabs [aria-selected="true"] {
+    color: var(--light);
+    background: linear-gradient(135deg, 
+        rgba(99, 102, 241, 0.2), 
+        rgba(6, 182, 212, 0.2));
+    border-bottom: 2px solid var(--primary);
+}
+
+/* Modern Charts */
+.chart-container {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur));
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    transition: var(--transition);
+}
+
+.chart-container:hover {
+    box-shadow: var(--shadow);
+    border-color: var(--primary);
+}
+
+/* Modern Sidebar */
+[data-testid="stSidebar"] {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur));
+    border-right: 1px solid var(--glass-border);
+}
+
+[data-testid="stSidebar"] .stSelectbox > div > div,
+[data-testid="stSidebar"] .stMultiSelect > div > div,
+[data-testid="stSidebar"] .stDateInput > div > div {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    backdrop-filter: blur(var(--blur));
+}
+
+/* Modern Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    color: white;
+    transition: var(--transition);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+}
+
+/* Modern Alerts */
+.stAlert {
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur));
+}
+
+/* AI Response Styling */
+.ai-response {
+    background: linear-gradient(135deg, 
+        rgba(139, 92, 246, 0.15), 
+        rgba(236, 72, 153, 0.15));
+    border-radius: 20px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    padding: 2rem;
+    margin: 1rem 0;
+    backdrop-filter: blur(var(--blur));
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-response::before {
+    content: '🤖';
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    opacity: 0.5;
+}
+
+/* Loading States */
+.stSpinner {
+    border-color: var(--primary) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hero-section {
+        padding: 2rem 1rem;
+    }
+    
+    .metric-card {
+        padding: 1.5rem;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--secondary), var(--primary));
+}
 </style>
 """
 
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+st.markdown(MODERN_CSS, unsafe_allow_html=True)
 
 # =========================================================
-# ----------------- KONFIGURASI PLOTLY --------------------
+# ------------------- KONFIGURASI PLOTLY -----------------
 # =========================================================
-def configure_plotly_theme() -> None:
-    template = go.layout.Template(
+def setup_plotly_theme():
+    """Setup tema plotly modern"""
+    theme = go.layout.Template(
         layout=go.Layout(
-            font=dict(family="Inter, 'Segoe UI', sans-serif", color="#E2E8F0"),
-            title=dict(font=dict(size=22, family="Inter, 'Segoe UI', sans-serif", color="#F8FAFC")),
+            font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", 
+                     color="#F8FAFC", size=12),
+            title=dict(font=dict(size=20, color="#F8FAFC"), x=0.5, xanchor='center'),
             paper_bgcolor="rgba(15, 23, 42, 0)",
-            plot_bgcolor="rgba(15, 23, 42, 0.35)",
+            plot_bgcolor="rgba(15, 23, 42, 0.3)",
+            colorway=PLOTLY_COLORS,
             legend=dict(
-                bgcolor="rgba(15, 23, 42, 0.6)",
-                bordercolor="rgba(148, 163, 184, 0.25)",
+                bgcolor="rgba(15, 23, 42, 0.8)",
+                bordercolor="rgba(255, 255, 255, 0.1)",
                 borderwidth=1,
-                font=dict(size=13)
+                font=dict(size=11)
             ),
-            margin=dict(l=60, r=40, t=80, b=60),
-            xaxis=dict(gridcolor="rgba(148,163,184,0.22)", zerolinecolor="rgba(148,163,184,0.32)"),
-            yaxis=dict(gridcolor="rgba(148,163,184,0.22)", zerolinecolor="rgba(148,163,184,0.32)"),
-            colorway=PLOTLY_COLORWAY
+            margin=dict(l=60, r=60, t=80, b=60),
+            xaxis=dict(
+                gridcolor="rgba(255, 255, 255, 0.1)",
+                zerolinecolor="rgba(255, 255, 255, 0.2)",
+                color="#F8FAFC"
+            ),
+            yaxis=dict(
+                gridcolor="rgba(255, 255, 255, 0.1)",
+                zerolinecolor="rgba(255, 255, 255, 0.2)",
+                color="#F8FAFC"
+            )
         )
     )
-    pio.templates["neon_glass"] = template
-    px.defaults.template = "neon_glass"
-    px.defaults.color_discrete_sequence = PLOTLY_COLORWAY
+    pio.templates["modern_dark"] = theme
+    px.defaults.template = "modern_dark"
 
-configure_plotly_theme()
+setup_plotly_theme()
 
 # =========================================================
-# ------------------- FUNGSI UTILITAS ---------------------
+# ------------------- FUNGSI UTILITAS --------------------
 # =========================================================
+def calculate_ppsa_score(row: pd.Series) -> float:
+    """
+    Menghitung total score PPSA berdasarkan bobot yang benar
+    """
+    total_score = 0.0
+    
+    for indicator, weight in PPSA_WEIGHTS.items():
+        acv_col = f'{indicator} ACV'
+        if acv_col in row.index:
+            # Konversi ACV ke numeric (hapus % jika ada)
+            acv_value = str(row[acv_col]).replace('%', '').replace(',', '.')
+            try:
+                acv_numeric = float(acv_value)
+                # ACV dikali bobot
+                weighted_score = acv_numeric * weight
+                total_score += weighted_score
+            except (ValueError, TypeError):
+                continue
+    
+    return round(total_score, 2)
+
 def format_currency(value: float) -> str:
+    """Format nilai ke rupiah"""
     try:
-        return f"Rp {value:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"Rp {value:,.0f}".replace(",", ".")
     except (TypeError, ValueError):
         return "Rp 0"
 
-
-def format_quantity(value: float) -> str:
+def format_percentage(value: float) -> str:
+    """Format nilai ke persentase"""
     try:
-        return f"{value:,.0f}".replace(",", ".")
+        return f"{value:.1f}%"
     except (TypeError, ValueError):
-        return "0"
+        return "0.0%"
 
+def create_metric_card(title: str, value: str, delta: str = None, 
+                      delta_type: str = "neutral", icon: str = "📊") -> str:
+    """Generate HTML untuk metric card modern"""
+    delta_class = f"delta-{delta_type}"
+    delta_html = f'<div class="metric-delta {delta_class}">{delta}</div>' if delta else ""
+    
+    return f"""
+    <div class="metric-card">
+        <div class="metric-icon">{icon}</div>
+        <div class="metric-label">{title}</div>
+        <div class="metric-value">{value}</div>
+        {delta_html}
+    </div>
+    """
 
-def render_metric_card(
-    title: str,
-    value: str,
-    delta_label: Optional[str] = None,
-    delta_type: str = "neutral",
-    icon: str = "📌"
-) -> None:
-    delta_class = {
-        "positive": "delta-positive",
-        "negative": "delta-negative",
-        "neutral": "delta-neutral"
-    }.get(delta_type, "delta-neutral")
-
-    delta_markup = ""
-    if delta_label:
-        delta_markup = f'<div class="metric-delta {delta_class}">{delta_label}</div>'
-
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-icon">{icon}</div>
-            <div class="metric-label">{title}</div>
-            <div class="metric-value">{value}</div>
-            {delta_markup}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-@st.cache_data(ttl=600, show_spinner=False)
-def load_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.DataFrame]:
+@st.cache_data(ttl=300, show_spinner=False)
+def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.DataFrame]:
+    """Load dan proses data dari Google Sheets dengan caching"""
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
+    
     try:
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        
+        # Progress indicator
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        status_text.text("🔗 Menghubungkan ke Google Sheets...")
+        progress_bar.progress(25)
+        
         spreadsheet = client.open_by_url(spreadsheet_url)
         worksheet = spreadsheet.worksheet(sheet_name)
+        
+        status_text.text("📊 Mengunduh data...")
+        progress_bar.progress(50)
+        
         df = get_as_dataframe(worksheet, evaluate_formulas=True)
-    except Exception as exc:
-        st.error(f"Gagal memuat data: {exc}")
+        
+        status_text.text("🔄 Memproses data...")
+        progress_bar.progress(75)
+        
+        # Bersihkan data
+        df.dropna(axis=0, how="all", inplace=True)
+        df.columns = df.columns.str.strip()
+        
+        # Konversi kolom tanggal
+        if 'TANGGAL' in df.columns:
+            df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
+        
+        # Hitung ulang total score PPSA dengan bobot yang benar
+        df['TOTAL SCORE PPSA (CORRECTED)'] = df.apply(calculate_ppsa_score, axis=1)
+        
+        status_text.text("✅ Data berhasil dimuat!")
+        progress_bar.progress(100)
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"❌ Gagal memuat data: {str(e)}")
         return None
 
-    df.dropna(axis=0, how="all", inplace=True)
-    df.columns = df.columns.str.strip()
+def filter_data(df: pd.DataFrame, filters: Dict) -> pd.DataFrame:
+    """Apply filters ke dataframe"""
+    filtered_df = df.copy()
     
-    return df
-
-
-def filter_dataframe(
-    df: pd.DataFrame,
-    date_range: Tuple[datetime, datetime],
-    selected_cashiers: List[str],
-    selected_shifts: List[str]
-) -> pd.DataFrame:
-    filtered = df.copy()
+    # Filter tanggal
+    if filters.get('date_range') and len(filters['date_range']) == 2:
+        start_date, end_date = filters['date_range']
+        if 'TANGGAL' in df.columns:
+            start_ts = pd.to_datetime(start_date)
+            end_ts = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+            filtered_df = filtered_df[
+                (filtered_df['TANGGAL'] >= start_ts) & 
+                (filtered_df['TANGGAL'] < end_ts)
+            ]
     
-    # Filter berdasarkan rentang tanggal
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_date, end_date = date_range
-    else:
-        start_date = end_date = date_range[0] if date_range else datetime.today()
-
-    # Konversi kolom tanggal jika ada
-    if 'TANGGAL' in df.columns:
-        df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
-        start_ts = pd.to_datetime(start_date)
-        end_ts = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        filtered = filtered[
-            (filtered["TANGGAL"] >= start_ts) &
-            (filtered["TANGGAL"] <= end_ts)
-        ]
-
-    # Filter berdasarkan kasir
-    if selected_cashiers and "Semua" not in selected_cashiers:
+    # Filter kasir
+    if filters.get('cashiers') and 'Semua' not in filters['cashiers']:
         if 'NAMA KASIR' in df.columns:
-            filtered = filtered[filtered["NAMA KASIR"].isin(selected_cashiers)]
-
-    # Filter berdasarkan shift
-    if selected_shifts and "Semua" not in selected_shifts:
+            filtered_df = filtered_df[filtered_df['NAMA KASIR'].isin(filters['cashiers'])]
+    
+    # Filter shift
+    if filters.get('shifts') and 'Semua' not in filters['shifts']:
         if 'SHIFT' in df.columns:
-            filtered = filtered[filtered["SHIFT"].isin(selected_shifts)]
-
-    return filtered
-
-
-def render_insight_card(title: str, value: str, description: str, icon: str = "✨") -> None:
-    st.markdown(
-        f"""
-        <div class="insight-card">
-            <h4>{icon} {title}</h4>
-            <p><strong>{value}</strong></p>
-            <p style="color: var(--color-text-muted); margin-bottom: 0;">{description}</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            filtered_df = filtered_df[filtered_df['SHIFT'].isin(filters['shifts'])]
+    
+    return filtered_df
 
 # =========================================================
-# ------------------- FUNGSI VISUALISASI -------------------
+# ------------------- VISUALISASI CHARTS -----------------
 # =========================================================
 def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
+    """Buat radar chart untuk PPSA indicators"""
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="Tidak ada data untuk ditampilkan",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
     # Hitung rata-rata ACV per indikator
     indicators = ['PSM', 'PWP', 'SG', 'APC']
-    avg_acv = {}
+    avg_values = []
+    labels = []
     
     for indicator in indicators:
         acv_col = f'{indicator} ACV'
         if acv_col in df.columns:
-            # Konversi nilai ACV ke numerik
-            df[acv_col] = df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.')
-            df[acv_col] = pd.to_numeric(df[acv_col], errors='coerce')
-            avg_acv[indicator] = df[acv_col].mean()
+            # Konversi ke numeric
+            acv_series = df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.')
+            acv_numeric = pd.to_numeric(acv_series, errors='coerce')
+            avg_acv = acv_numeric.mean()
+            
+            if not pd.isna(avg_acv):
+                avg_values.append(avg_acv)
+                labels.append(indicator)
     
-    # Buat chart radar
+    if not avg_values:
+        return go.Figure().add_annotation(
+            text="Data ACV tidak tersedia",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
+    # Buat radar chart
     fig = go.Figure()
     
+    # Data aktual
     fig.add_trace(go.Scatterpolar(
-        r=list(avg_acv.values()),
-        theta=list(avg_acv.keys()),
+        r=avg_values,
+        theta=labels,
         fill='toself',
         name='Rata-rata ACV',
-        line_color=COLOR_PRIMARY,
-        fillcolor=f'rgba(99, 102, 241, 0.25)'
+        line_color=COLOR_SCHEME['primary'],
+        fillcolor=f"rgba(99, 102, 241, 0.3)"
     ))
     
-    # Tambahkan garis target (100%)
+    # Target line (100%)
+    target_values = [100] * len(labels)
     fig.add_trace(go.Scatterpolar(
-        r=[100, 100, 100, 100],
-        theta=list(avg_acv.keys()),
+        r=target_values,
+        theta=labels,
         mode='lines',
         name='Target (100%)',
-        line_color=COLOR_ACCENT,
+        line_color=COLOR_SCHEME['success'],
         line_dash='dash'
     ))
     
@@ -503,586 +611,726 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 120]
+                range=[0, max(120, max(avg_values) * 1.1)]
             )
         ),
-        title="<b>Radar Performa PPSA</b>",
-        title_x=0.5
+        title="<b>📊 Radar Performa PPSA</b>",
+        height=500
     )
     
     return fig
-
 
 def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
-    # Hitung total score per kasir
-    if 'TOTAL SCORE PPSA' in df.columns:
-        # Konversi ke numerik
-        df['TOTAL SCORE PPSA'] = pd.to_numeric(df['TOTAL SCORE PPSA'], errors='coerce')
-        
-        cashier_scores = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().reset_index()
-        cashier_scores = cashier_scores.sort_values('TOTAL SCORE PPSA', ascending=False)
-        
-        fig = px.bar(
-            cashier_scores,
-            x='TOTAL SCORE PPSA',
-            y='NAMA KASIR',
-            orientation='h',
-            color='TOTAL SCORE PPSA',
-            color_continuous_scale=[COLOR_NEGATIVE, COLOR_WARNING, COLOR_SUCCESS],
-            labels={'TOTAL SCORE PPSA': 'Total Score', 'NAMA KASIR': 'Nama Kasir'},
-            title="<b>Performa Kasir (Total Score PPSA)</b>",
-            height=500
+    """Chart performa kasir berdasarkan total score PPSA"""
+    if df.empty or 'TOTAL SCORE PPSA (CORRECTED)' not in df.columns:
+        return go.Figure().add_annotation(
+            text="Data performa kasir tidak tersedia",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
         )
-        
-        fig.update_layout(
-            yaxis=dict(categoryorder='total ascending'),
-            title_x=0.5,
-            coloraxis_showscale=False
-        )
-        
-        return fig
     
-    # Fallback jika kolom tidak ada
-    fig = go.Figure()
-    fig.add_annotation(
-        text="Kolom TOTAL SCORE PPSA tidak ditemukan",
-        xref="paper", yref="paper",
-        x=0.5, y=0.5,
-        showarrow=False,
-        font=dict(color="#CBD5F5", size=16)
+    # Group by kasir
+    cashier_performance = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA (CORRECTED)'].agg([
+        'mean', 'count'
+    ]).reset_index()
+    
+    cashier_performance.columns = ['NAMA KASIR', 'Rata_rata_Score', 'Jumlah_Transaksi']
+    cashier_performance = cashier_performance.sort_values('Rata_rata_Score', ascending=True)
+    
+    # Tentukan warna berdasarkan performa
+    colors = []
+    for score in cashier_performance['Rata_rata_Score']:
+        if score >= 80:
+            colors.append(COLOR_SCHEME['success'])
+        elif score >= 60:
+            colors.append(COLOR_SCHEME['warning'])
+        else:
+            colors.append(COLOR_SCHEME['danger'])
+    
+    fig = go.Figure(go.Bar(
+        x=cashier_performance['Rata_rata_Score'],
+        y=cashier_performance['NAMA KASIR'],
+        orientation='h',
+        marker_color=colors,
+        text=[f"{score:.1f}" for score in cashier_performance['Rata_rata_Score']],
+        textposition='auto',
+        hovertemplate="<b>%{y}</b><br>" +
+                     "Score: %{x:.1f}<br>" +
+                     "Transaksi: %{customdata}<br>" +
+                     "<extra></extra>",
+        customdata=cashier_performance['Jumlah_Transaksi']
+    ))
+    
+    fig.update_layout(
+        title="<b>👥 Performa Kasir (Total Score PPSA)</b>",
+        xaxis_title="Total Score PPSA",
+        yaxis_title="Nama Kasir",
+        height=max(400, len(cashier_performance) * 40),
+        showlegend=False
     )
-    fig.update_layout(title="<b>Performa Kasir</b>", title_x=0.5)
+    
+    # Tambahkan garis referensi
+    fig.add_vline(x=80, line_dash="dash", line_color=COLOR_SCHEME['success'], 
+                  annotation_text="Target Excellent (80)")
+    fig.add_vline(x=60, line_dash="dash", line_color=COLOR_SCHEME['warning'], 
+                  annotation_text="Target Good (60)")
+    
     return fig
-
 
 def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
-    # Konversi kolom yang relevan
-    if 'ACV TEBUS 2500' in df.columns:
-        df['ACV TEBUS 2500'] = df['ACV TEBUS 2500'].astype(str).str.replace('%', '').str.replace(',', '.')
-        df['ACV TEBUS 2500'] = pd.to_numeric(df['ACV TEBUS 2500'], errors='coerce')
-        
-        if 'TARGET TEBUS 2500' in df.columns:
-            df['TARGET TEBUS 2500'] = pd.to_numeric(df['TARGET TEBUS 2500'], errors='coerce')
-        if 'ACTUAL TEBUS 2500' in df.columns:
-            df['ACTUAL TEBUS 2500'] = pd.to_numeric(df['ACTUAL TEBUS 2500'], errors='coerce')
-        
-        # Group by kasir
-        tebus_data = df.groupby('NAMA KASIR').agg({
-            'TARGET TEBUS 2500': 'sum',
-            'ACTUAL TEBUS 2500': 'sum',
-            'ACV TEBUS 2500': 'mean'
-        }).reset_index()
-        
-        # Hitung total
-        tebus_data = tebus_data.sort_values('ACV TEBUS 2500', ascending=False)
-        
-        fig = go.Figure()
-        
-        # Tambahkan bar untuk actual vs target
-        fig.add_trace(go.Bar(
-            x=tebus_data['NAMA KASIR'],
-            y=tebus_data['TARGET TEBUS 2500'],
-            name='Target',
-            marker_color=COLOR_ACCENT,
-            opacity=0.7
-        ))
-        
-        fig.add_trace(go.Bar(
-            x=tebus_data['NAMA KASIR'],
-            y=tebus_data['ACTUAL TEBUS 2500'],
-            name='Actual',
-            marker_color=COLOR_SUCCESS,
-            opacity=0.7
-        ))
-        
-        # Tambahkan line untuk ACV
-        fig.add_trace(go.Scatter(
-            x=tebus_data['NAMA KASIR'],
-            y=tebus_data['ACV TEBUS 2500'],
-            mode='markers+lines',
-            name='ACV (%)',
-            marker=dict(size=8, color=COLOR_PRIMARY),
-            line=dict(width=2, color=COLOR_PRIMARY),
-            yaxis='y2'
-        ))
-        
-        fig.update_layout(
-            title="<b>Performa Tebus Murah Rp 2.500</b>",
-            xaxis_title="Nama Kasir",
-            yaxis_title="Nilai",
-            yaxis2=dict(
-                title="ACV (%)",
-                overlaying='y',
-                side='right',
-                range=[0, 120]
+    """Chart analisis tebus murah"""
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="Data tebus murah tidak tersedia",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
+    # Cek ketersediaan kolom
+    required_cols = ['TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'ACV TEBUS 2500']
+    available_cols = [col for col in required_cols if col in df.columns]
+    
+    if not available_cols:
+        return go.Figure().add_annotation(
+            text="Kolom data tebus murah tidak ditemukan",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
+    # Konversi data
+    for col in available_cols:
+        if 'ACV' in col:
+            df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Group by kasir
+    tebus_data = df.groupby('NAMA KASIR').agg({
+        col: 'sum' if 'TARGET' in col or 'ACTUAL' in col else 'mean' 
+        for col in available_cols
+    }).reset_index()
+    
+    tebus_data = tebus_data.sort_values('ACV TEBUS 2500', ascending=False)
+    
+    # Buat subplots
+    fig = make_subplots(
+        specs=[[{"secondary_y": True}]],
+        subplot_titles=["💰 Performa Tebus Murah Rp 2.500"]
+    )
+    
+    # Bar chart untuk target vs actual
+    if 'TARGET TEBUS 2500' in available_cols:
+        fig.add_trace(
+            go.Bar(
+                x=tebus_data['NAMA KASIR'],
+                y=tebus_data['TARGET TEBUS 2500'],
+                name='Target',
+                marker_color=COLOR_SCHEME['info'],
+                opacity=0.7
             ),
-            title_x=0.5,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            )
+            secondary_y=False
         )
-        
-        return fig
     
-    # Fallback jika kolom tidak ada
-    fig = go.Figure()
-    fig.add_annotation(
-        text="Kolom Tebus Murah tidak ditemukan",
-        xref="paper", yref="paper",
-        x=0.5, y=0.5,
-        showarrow=False,
-        font=dict(color="#CBD5F5", size=16)
+    if 'ACTUAL TEBUS 2500' in available_cols:
+        fig.add_trace(
+            go.Bar(
+                x=tebus_data['NAMA KASIR'],
+                y=tebus_data['ACTUAL TEBUS 2500'],
+                name='Actual',
+                marker_color=COLOR_SCHEME['success'],
+                opacity=0.8
+            ),
+            secondary_y=False
+        )
+    
+    # Line chart untuk ACV
+    if 'ACV TEBUS 2500' in available_cols:
+        fig.add_trace(
+            go.Scatter(
+                x=tebus_data['NAMA KASIR'],
+                y=tebus_data['ACV TEBUS 2500'],
+                mode='lines+markers',
+                name='ACV (%)',
+                line=dict(color=COLOR_SCHEME['accent'], width=3),
+                marker=dict(size=8)
+            ),
+            secondary_y=True
+        )
+    
+    fig.update_xaxes(title_text="Nama Kasir")
+    fig.update_yaxes(title_text="Jumlah Item", secondary_y=False)
+    fig.update_yaxes(title_text="ACV (%)", secondary_y=True)
+    
+    fig.update_layout(
+        height=500,
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    fig.update_layout(title="<b>Performa Tebus Murah</b>", title_x=0.5)
+    
     return fig
 
-
-def create_trend_chart(df: pd.DataFrame) -> go.Figure:
-    # Konversi kolom tanggal
-    if 'TANGGAL' in df.columns:
-        df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
-        
-        # Konversi kolom score
-        if 'TOTAL SCORE PPSA' in df.columns:
-            df['TOTAL SCORE PPSA'] = pd.to_numeric(df['TOTAL SCORE PPSA'], errors='coerce')
-        
-        # Group by tanggal
-        trend_data = df.groupby(df['TANGGAL'].dt.date)['TOTAL SCORE PPSA'].mean().reset_index()
-        
-        # Tambahkan moving average
-        trend_data['MA_7'] = trend_data['TOTAL SCORE PPSA'].rolling(7, min_periods=1).mean()
-        
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
-            x=trend_data['TANGGAL'],
-            y=trend_data['TOTAL SCORE PPSA'],
-            mode='lines+markers',
-            name='Rata-rata Score Harian',
-            line=dict(color=COLOR_PRIMARY, width=3),
-            marker=dict(size=6)
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=trend_data['TANGGAL'],
-            y=trend_data['MA_7'],
-            mode='lines',
-            name='Moving Average (7 Hari)',
-            line=dict(color=COLOR_ACCENT, width=3, dash="dot")
-        ))
-        
-        fig.update_layout(
-            title="<b>Tren Performa PPSA</b>",
-            xaxis_title="Tanggal",
-            yaxis_title="Rata-rata Score",
-            title_x=0.5
+def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
+    """Chart analisis tren performance"""
+    if df.empty or 'TANGGAL' not in df.columns:
+        return go.Figure().add_annotation(
+            text="Data tanggal tidak tersedia untuk analisis tren",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
         )
-        
-        return fig
     
-    # Fallback jika kolom tidak ada
-    fig = go.Figure()
-    fig.add_annotation(
-        text="Kolom TANGGAL atau TOTAL SCORE PPSA tidak ditemukan",
-        xref="paper", yref="paper",
-        x=0.5, y=0.5,
-        showarrow=False,
-        font=dict(color="#CBD5F5", size=16)
-    )
-    fig.update_layout(title="<b>Tren Performa</b>", title_x=0.5)
-    return fig
-
-
-def create_shift_comparison_chart(df: pd.DataFrame) -> go.Figure:
-    if 'SHIFT' in df.columns and 'TOTAL SCORE PPSA' in df.columns:
-        df['TOTAL SCORE PPSA'] = pd.to_numeric(df['TOTAL SCORE PPSA'], errors='coerce')
-        
-        shift_data = df.groupby('SHIFT')['TOTAL SCORE PPSA'].mean().reset_index()
-        
-        fig = px.bar(
-            shift_data,
-            x='SHIFT',
-            y='TOTAL SCORE PPSA',
-            color='TOTAL SCORE PPSA',
-            color_continuous_scale=[COLOR_NEGATIVE, COLOR_WARNING, COLOR_SUCCESS],
-            labels={'TOTAL SCORE PPSA': 'Rata-rata Score', 'SHIFT': 'Shift'},
-            title="<b>Perbandingan Performa per Shift</b>",
-            height=400
-        )
-        
-        fig.update_layout(title_x=0.5, coloraxis_showscale=False)
-        return fig
+    # Konversi kolom score
+    if 'TOTAL SCORE PPSA (CORRECTED)' in df.columns:
+        df['TOTAL SCORE PPSA (CORRECTED)'] = pd.to_numeric(df['TOTAL SCORE PPSA (CORRECTED)'], errors='coerce')
     
-    # Fallback jika kolom tidak ada
+    # Group by tanggal
+    daily_performance = df.groupby(df['TANGGAL'].dt.date).agg({
+        'TOTAL SCORE PPSA (CORRECTED)': ['mean', 'count'],
+        'NAMA KASIR': 'nunique'
+    }).reset_index()
+    
+    daily_performance.columns = ['Tanggal', 'Avg_Score', 'Total_Transaksi', 'Jumlah_Kasir']
+    
+    # Hitung moving average
+    daily_performance['MA_3'] = daily_performance['Avg_Score'].rolling(3, min_periods=1).mean()
+    daily_performance['MA_7'] = daily_performance['Avg_Score'].rolling(7, min_periods=1).mean()
+    
     fig = go.Figure()
-    fig.add_annotation(
-        text="Kolom SHIFT atau TOTAL SCORE PPSA tidak ditemukan",
-        xref="paper", yref="paper",
-        x=0.5, y=0.5,
-        showarrow=False,
-        font=dict(color="#CBD5F5", size=16)
+    
+    # Area chart untuk score harian
+    fig.add_trace(go.Scatter(
+        x=daily_performance['Tanggal'],
+        y=daily_performance['Avg_Score'],
+        mode='lines+markers',
+        name='Score Harian',
+        line=dict(color=COLOR_SCHEME['primary'], width=2),
+        marker=dict(size=6),
+        fill='tonexty',
+        fillcolor=f"rgba(99, 102, 241, 0.1)"
+    ))
+    
+    # Moving averages
+    fig.add_trace(go.Scatter(
+        x=daily_performance['Tanggal'],
+        y=daily_performance['MA_3'],
+        mode='lines',
+        name='MA 3 Hari',
+        line=dict(color=COLOR_SCHEME['secondary'], width=2, dash='dot')
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=daily_performance['Tanggal'],
+        y=daily_performance['MA_7'],
+        mode='lines',
+        name='MA 7 Hari',
+        line=dict(color=COLOR_SCHEME['success'], width=3, dash='dash')
+    ))
+    
+    fig.update_layout(
+        title="<b>📈 Tren Performa Harian PPSA</b>",
+        xaxis_title="Tanggal",
+        yaxis_title="Rata-rata Score PPSA",
+        height=500,
+        hovermode='x unified'
     )
-    fig.update_layout(title="<b>Perbandingan Shift</b>", title_x=0.5)
+    
     return fig
-
 
 # =========================================================
-# ------------------- FUNGSI GEMINI AI --------------------
+# -------------------- GEMINI AI INTEGRATION -------------
 # =========================================================
-def configure_gemini():
+def setup_gemini():
+    """Setup Gemini AI"""
     try:
         api_key = st.secrets["gemini"]["api_key"]
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        return model
+        return genai.GenerativeModel('gemini-2.0-flash')
     except Exception as e:
-        st.error(f"Gagal mengkonfigurasi Gemini API: {e}")
+        st.error(f"❌ Gagal setup Gemini AI: {e}")
         return None
 
-
-def generate_ai_insights(df: pd.DataFrame, model) -> str:
+def generate_advanced_insights(df: pd.DataFrame, model) -> str:
+    """Generate advanced AI insights dari data"""
     if df.empty or model is None:
-        return "Tidak ada data atau model tidak tersedia."
+        return "Tidak dapat menghasilkan insight karena data kosong atau model tidak tersedia."
     
-    # Siapkan ringkasan data
+    # Siapkan data summary untuk AI
     total_records = len(df)
-    if 'TANGGAL' in df.columns:
-        df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
-        date_range = f"{df['TANGGAL'].min().date()} hingga {df['TANGGAL'].max().date()}"
-    else:
-        date_range = "Tidak tersedia"
+    unique_cashiers = df['NAMA KASIR'].nunique() if 'NAMA KASIR' in df.columns else 0
     
-    # Hitung metrik PPSA
-    ppsa_metrics = {}
-    indicators = ['PSM', 'PWP', 'SG', 'APC']
+    # Analisis PPSA
+    ppsa_summary = {}
+    if 'TOTAL SCORE PPSA (CORRECTED)' in df.columns:
+        scores = df['TOTAL SCORE PPSA (CORRECTED)']
+        ppsa_summary = {
+            'avg_score': scores.mean(),
+            'max_score': scores.max(),
+            'min_score': scores.min(),
+            'std_score': scores.std()
+        }
     
-    for indicator in indicators:
+    # Analisis per indikator
+    indicators_analysis = {}
+    for indicator in ['PSM', 'PWP', 'SG', 'APC']:
         acv_col = f'{indicator} ACV'
         if acv_col in df.columns:
-            df[acv_col] = df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.')
-            df[acv_col] = pd.to_numeric(df[acv_col], errors='coerce')
-            ppsa_metrics[indicator] = df[acv_col].mean()
+            acv_series = pd.to_numeric(
+                df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.'),
+                errors='coerce'
+            )
+            indicators_analysis[indicator] = {
+                'avg': acv_series.mean(),
+                'weight': PPSA_WEIGHTS[indicator],
+                'contribution': acv_series.mean() * PPSA_WEIGHTS[indicator]
+            }
     
-    # Hitung metrik Tebus Murah
-    tebus_metrics = {}
-    if 'ACV TEBUS 2500' in df.columns:
-        df['ACV TEBUS 2500'] = df['ACV TEBUS 2500'].astype(str).str.replace('%', '').str.replace(',', '.')
-        df['ACV TEBUS 2500'] = pd.to_numeric(df['ACV TEBUS 2500'], errors='coerce')
-        tebus_metrics['acv'] = df['ACV TEBUS 2500'].mean()
+    # Best and worst performers
+    if 'NAMA KASIR' in df.columns and 'TOTAL SCORE PPSA (CORRECTED)' in df.columns:
+        cashier_performance = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA (CORRECTED)'].mean()
+        best_performer = cashier_performance.idxmax()
+        worst_performer = cashier_performance.idxmin()
+        best_score = cashier_performance.max()
+        worst_score = cashier_performance.min()
+    else:
+        best_performer = worst_performer = "N/A"
+        best_score = worst_score = 0
     
     # Buat prompt untuk Gemini
     prompt = f"""
-    Analisis data performa kasir berikut dan berikan insight yang berharga:
-    
-    Ringkasan Data:
-    - Total Records: {total_records}
-    - Periode Data: {date_range}
-    
-    Metrik PPSA (Rata-rata ACV):
-    - PSM: {ppsa_metrics.get('PSM', 'N/A')}%
-    - PWP: {ppsa_metrics.get('PWP', 'N/A')}%
-    - SG: {ppsa_metrics.get('SG', 'N/A')}%
-    - APC: {ppsa_metrics.get('APC', 'N/A')}%
-    
-    Metrik Tebus Murah:
-    - ACV Rata-rata: {tebus_metrics.get('acv', 'N/A')}%
-    
-    Berikan analisis mendalam tentang:
-    1. Performa keseluruhan PPSA dan Tebus Murah
-    2. Indikator dengan performa terbaik dan terburuk
-    3. Area yang perlu mendapat perhatian khusus
-    4. Rekomendasi tindakan untuk meningkatkan performa
-    5. Strategi untuk mengoptimalkan penjualan
-    
-    Jawab dalam bahasa Indonesia dengan gaya profesional namun mudah dipahami.
+    Sebagai seorang Business Intelligence Analyst expert, analisis data performa kasir PPSA berikut:
+
+    📊 RINGKASAN DATA:
+    - Total Transaksi: {total_records:,}
+    - Jumlah Kasir Aktif: {unique_cashiers}
+    - Period: {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
+
+    🎯 PERFORMA PPSA (dengan bobot yang benar):
+    - Rata-rata Total Score: {ppsa_summary.get('avg_score', 0):.2f}
+    - Score Tertinggi: {ppsa_summary.get('max_score', 0):.2f}
+    - Score Terendah: {ppsa_summary.get('min_score', 0):.2f}
+    - Standar Deviasi: {ppsa_summary.get('std_score', 0):.2f}
+
+    📈 ANALISIS PER INDIKATOR (ACV × Bobot):
+    """ + "\n".join([f"- {indicator}: {data['avg']:.1f}% × {data['weight']*100:.0f}% = {data['contribution']:.2f} poin"
+                     for indicator, data in indicators_analysis.items()]) + f"""
+
+    🏆 PERFORMA KASIR:
+    - Terbaik: {best_performer} ({best_score:.2f} poin)
+    - Terburuk: {worst_performer} ({worst_score:.2f} poin)
+    - Gap Performa: {best_score - worst_score:.2f} poin
+
+    Berikan analisis mendalam yang mencakup:
+
+    1. 🔍 ANALISIS PERFORMA KESELURUHAN
+    - Bagaimana performa PPSA secara umum?
+    - Indikator mana yang paling berkontribusi/menghambat?
+    - Apakah ada pola atau tren yang menarik?
+
+    2. ⚠️ AREA CRITICAL & OPPORTUNITY
+    - Indikator mana yang butuh perhatian khusus?
+    - Kasir mana yang perlu coaching intensif?
+    - Potensi peningkatan score jika fokus pada area tertentu?
+
+    3. 🚀 REKOMENDASI STRATEGIS
+    - Action plan konkret untuk meningkatkan performa
+    - Prioritas improvement berdasarkan bobot indikator
+    - Target realistis untuk periode berikutnya
+
+    4. 💡 INSIGHTS BISNIS
+    - Correlation antara performa kasir dengan faktor lain
+    - Benchmark industry jika applicable
+    - Prediksi dampak jika rekomendasi dijalankan
+
+    Format response dalam bahasa Indonesia yang profesional namun engaging, gunakan emoji untuk memperjelas poin-poin penting.
     """
     
     try:
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"Terjadi kesalahan saat menghasilkan insight: {e}"
-
-
-# =========================================================
-# ----------------------- SIDEBAR -------------------------
-# =========================================================
-with st.sidebar:
-    st.header("🎛️ Kontrol Dashboard")
-    st.caption("Atur parameter analitik secara real-time untuk melihat performa kasir.")
-    
-    st.divider()
-    
-    try:
-        spreadsheet_url = st.secrets["spreadsheet"]["url"]
-        st.success("✅ Terhubung ke Google Sheets via Secrets")
-    except (KeyError, FileNotFoundError):
-        spreadsheet_url = st.text_input(
-            "URL Google Spreadsheet",
-            placeholder="https://docs.google.com/spreadsheets/d/...",
-            help="Masukkan URL jika tidak menggunakan st.secrets."
-        )
-        st.caption("Tip: Simpan kredensial pada `st.secrets` untuk koneksi otomatis.")
-    
-    sheet_name = st.text_input(
-        "Nama Worksheet",
-        value="Data",
-        help="Pastikan nama worksheet sesuai dengan di Google Sheets."
-    )
-    
-    st.markdown("---")
-    
-    st.subheader("🧮 Filter")
-    
-    # Filter akan ditambahkan setelah data dimuat
-    st.info("Filter akan tersedia setelah data dimuat")
-    
-    st.markdown("---")
-    
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        st.experimental_rerun()
+        return f"❌ Terjadi kesalahan saat menghasilkan insight: {e}"
 
 # =========================================================
-# ---------------------- MAIN APP -------------------------
+# -------------------- SIDEBAR CONTROLS ------------------
 # =========================================================
-st.markdown(
-    """
-    <div class="hero-card">
-        <h1>📊 Dashboard PPSA & Tebus Murah</h1>
-        <p>Menghadirkan visual interaktif dan insight instan untuk memantau performa kasir secara komprehensif.
-        <br/><strong>📍 Toko:</strong> 2GC6 BAROS PANDEGLANG</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-if not spreadsheet_url.strip():
-    st.warning("Masukkan URL Google Spreadsheet terlebih dahulu untuk memulai.")
-    st.stop()
-
-with st.spinner("Memuat dan memproses data dari Google Sheets..."):
-    dataframe = load_data(spreadsheet_url, sheet_name)
-
-if dataframe is None or dataframe.empty:
-    st.error("Tidak ada data yang dapat diproses. Periksa kembali sumber data Anda.")
-    st.stop()
-
-# Initialize Gemini model
-gemini_model = configure_gemini()
-
-# Tambahkan filter setelah data dimuat
-with st.sidebar:
-    st.subheader("🧮 Filter")
-    
-    # Filter berdasarkan rentang tanggal
-    if 'TANGGAL' in dataframe.columns:
-        dataframe['TANGGAL'] = pd.to_datetime(dataframe['TANGGAL'], errors='coerce', dayfirst=True)
-        min_date = dataframe["TANGGAL"].min().to_pydatetime()
-        max_date = dataframe["TANGGAL"].max().to_pydatetime()
+def render_sidebar(df: pd.DataFrame) -> Dict:
+    """Render sidebar dengan controls modern"""
+    with st.sidebar:
+        st.markdown("## 🎛️ Control Center")
+        st.markdown("---")
         
-        selected_date_range = st.date_input(
-            "Rentang Tanggal",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date
+        # Connection status
+        try:
+            spreadsheet_url = st.secrets["spreadsheet"]["url"]
+            st.success("🔗 Connected to Google Sheets")
+        except:
+            spreadsheet_url = st.text_input(
+                "📊 Google Spreadsheet URL",
+                placeholder="https://docs.google.com/spreadsheets/d/...",
+                help="Masukkan URL Google Sheets"
+            )
+        
+        sheet_name = st.text_input(
+            "📄 Worksheet Name",
+            value="Data",
+            help="Nama sheet dalam Google Sheets"
         )
-    else:
-        selected_date_range = None
-        st.warning("Kolom TANGGAL tidak ditemukan dalam data")
-    
-    # Filter berdasarkan kasir
-    if 'NAMA KASIR' in dataframe.columns:
-        available_cashiers = sorted(dataframe["NAMA KASIR"].unique().tolist())
-        available_cashiers = ["Semua"] + available_cashiers
-        selected_cashiers = st.multiselect(
-            "Filter Kasir",
-            options=available_cashiers,
-            default=["Semua"]
-        )
-    else:
-        selected_cashiers = ["Semua"]
-        st.warning("Kolom NAMA KASIR tidak ditemukan dalam data")
-    
-    # Filter berdasarkan shift
-    if 'SHIFT' in dataframe.columns:
-        available_shifts = sorted(dataframe["SHIFT"].unique().tolist())
-        available_shifts = ["Semua"] + available_shifts
-        selected_shifts = st.multiselect(
-            "Filter Shift",
-            options=available_shifts,
-            default=["Semua"]
-        )
-    else:
-        selected_shifts = ["Semua"]
-        st.warning("Kolom SHIFT tidak ditemukan dalam data")
-
-# Filter data
-filtered_df = filter_dataframe(
-    dataframe,
-    date_range=selected_date_range,
-    selected_cashiers=selected_cashiers,
-    selected_shifts=selected_shifts
-)
-
-if filtered_df.empty:
-    st.warning("Filter saat ini tidak menghasilkan data. Sesuaikan parameter filter.")
-    st.stop()
+        
+        st.markdown("---")
+        
+        # Filters
+        st.markdown("### 🔍 Filters")
+        
+        filters = {}
+        
+        # Date filter
+        if 'TANGGAL' in df.columns and not df.empty:
+            min_date = df['TANGGAL'].min().date()
+            max_date = df['TANGGAL'].max().date()
+            
+            filters['date_range'] = st.date_input(
+                "📅 Periode Tanggal",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date
+            )
+        
+        # Cashier filter
+        if 'NAMA KASIR' in df.columns and not df.empty:
+            cashiers = ['Semua'] + sorted(df['NAMA KASIR'].unique().tolist())
+            filters['cashiers'] = st.multiselect(
+                "👥 Pilih Kasir",
+                options=cashiers,
+                default=['Semua']
+            )
+        
+        # Shift filter
+        if 'SHIFT' in df.columns and not df.empty:
+            shifts = ['Semua'] + sorted(df['SHIFT'].unique().tolist())
+            filters['shifts'] = st.multiselect(
+                "⏰ Pilih Shift",
+                options=shifts,
+                default=['Semua']
+            )
+        
+        st.markdown("---")
+        
+        # Refresh button
+        if st.button("🔄 Refresh Data", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+        
+        # Data info
+        if not df.empty:
+            st.markdown("### 📋 Data Info")
+            st.info(f"""
+            **Total Records:** {len(df):,}  
+            **Kasir Aktif:** {df['NAMA KASIR'].nunique() if 'NAMA KASIR' in df.columns else 'N/A'}  
+            **Periode:** {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
+            """)
+        
+        return {'spreadsheet_url': spreadsheet_url, 'sheet_name': sheet_name, **filters}
 
 # =========================================================
-# --------------------- RINGKASAN KPI ---------------------
+# ----------------------- MAIN APP -----------------------
 # =========================================================
-st.subheader("🔑 Ringkasan Eksekutif")
-
-# Hitung metrik PPSA
-total_score = 0
-avg_score = 0
-if 'TOTAL SCORE PPSA' in filtered_df.columns:
-    filtered_df['TOTAL SCORE PPSA'] = pd.to_numeric(filtered_df['TOTAL SCORE PPSA'], errors='coerce')
-    total_score = filtered_df['TOTAL SCORE PPSA'].sum()
-    avg_score = filtered_df['TOTAL SCORE PPSA'].mean()
-
-# Hitung metrik Tebus Murah
-total_target_tebus = 0
-total_actual_tebus = 0
-avg_acv_tebus = 0
-if 'TARGET TEBUS 2500' in filtered_df.columns and 'ACTUAL TEBUS 2500' in filtered_df.columns:
-    filtered_df['TARGET TEBUS 2500'] = pd.to_numeric(filtered_df['TARGET TEBUS 2500'], errors='coerce')
-    filtered_df['ACTUAL TEBUS 2500'] = pd.to_numeric(filtered_df['ACTUAL TEBUS 2500'], errors='coerce')
-    total_target_tebus = filtered_df['TARGET TEBUS 2500'].sum()
-    total_actual_tebus = filtered_df['ACTUAL TEBUS 2500'].sum()
+def main():
+    """Main application function"""
+    
+    # Hero Section
+    st.markdown("""
+    <div class="hero-section">
+        <h1 class="hero-title">🚀 Dashboard PPSA & Tebus Murah 2025</h1>
+        <p class="hero-subtitle">
+            Advanced Analytics Dashboard dengan AI-powered insights untuk monitoring performa kasir secara real-time.
+            <br><strong>🏪 Toko:</strong> 2GC6 BAROS PANDEGLANG
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize empty dataframe
+    df = pd.DataFrame()
+    
+    # Render sidebar and get config
+    config = render_sidebar(df)
+    
+    if not config['spreadsheet_url']:
+        st.warning("⚠️ Masukkan URL Google Spreadsheet untuk memulai")
+        return
+    
+    # Load data
+    df = load_and_process_data(config['spreadsheet_url'], config['sheet_name'])
+    
+    if df is None or df.empty:
+        st.error("❌ Tidak dapat memuat data. Periksa URL dan nama sheet.")
+        return
+    
+    # Update sidebar with loaded data
+    config.update(render_sidebar(df))
+    
+    # Apply filters
+    filtered_df = filter_data(df, config)
+    
+    if filtered_df.empty:
+        st.warning("⚠️ Filter yang dipilih tidak menghasilkan data")
+        return
+    
+    # Key Metrics Section
+    st.markdown("## 📊 Key Performance Indicators")
+    
+    # Calculate metrics
+    total_transactions = len(filtered_df)
+    avg_ppsa_score = filtered_df['TOTAL SCORE PPSA (CORRECTED)'].mean() if 'TOTAL SCORE PPSA (CORRECTED)' in filtered_df.columns else 0
+    
+    # Tebus Murah metrics
+    if 'ACTUAL TEBUS 2500' in filtered_df.columns:
+        total_tebus_actual = filtered_df['ACTUAL TEBUS 2500'].sum()
+    else:
+        total_tebus_actual = 0
     
     if 'ACV TEBUS 2500' in filtered_df.columns:
-        filtered_df['ACV TEBUS 2500'] = filtered_df['ACV TEBUS 2500'].astype(str).str.replace('%', '').str.replace(',', '.')
-        filtered_df['ACV TEBUS 2500'] = pd.to_numeric(filtered_df['ACV TEBUS 2500'], errors='coerce')
-        avg_acv_tebus = filtered_df['ACV TEBUS 2500'].mean()
-
-# Hitung jumlah kasir dan shift
-total_cashiers = filtered_df['NAMA KASIR'].nunique() if 'NAMA KASIR' in filtered_df.columns else 0
-total_shifts = filtered_df['SHIFT'].nunique() if 'SHIFT' in filtered_df.columns else 0
-
-metric_container = st.container()
-with metric_container:
-    st.markdown('<div class="metric-grid">', unsafe_allow_html=True)
-    render_metric_card(
-        "Total Score PPSA",
-        f"{total_score:.2f}",
-        icon="📊"
-    )
-    render_metric_card(
-        "Rata-rata Score PPSA",
-        f"{avg_score:.2f}",
-        icon="📈"
-    )
-    render_metric_card(
-        "Total Target Tebus",
-        format_quantity(total_target_tebus),
-        icon="🎯"
-    )
-    render_metric_card(
-        "Total Actual Tebus",
-        format_quantity(total_actual_tebus),
-        icon="✅"
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-st.divider()
-
-# =========================================================
-# -------------------- VISUALISASI ------------------------
-# =========================================================
-tabs = st.tabs([
-    "📊 Analisis PPSA",
-    "💰 Analisis Tebus Murah",
-    "📈 Tren Performa",
-    "🤖 Analisis AI"
-])
-
-with tabs[0]:
-    st.subheader("📊 Analisis PPSA")
+        avg_tebus_acv = pd.to_numeric(
+            filtered_df['ACV TEBUS 2500'].astype(str).str.replace('%', '').str.replace(',', '.'),
+            errors='coerce'
+        ).mean()
+    else:
+        avg_tebus_acv = 0
     
-    col1, col2 = st.columns(2)
+    # Render metrics grid
+    st.markdown('<div class="metrics-grid">', unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.plotly_chart(create_ppsa_radar_chart(filtered_df), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(create_metric_card(
+            "Total Transaksi",
+            f"{total_transactions:,}",
+            icon="📋"
+        ), unsafe_allow_html=True)
     
     with col2:
+        delta_type = "positive" if avg_ppsa_score >= 70 else "warning" if avg_ppsa_score >= 50 else "negative"
+        st.markdown(create_metric_card(
+            "Rata-rata Score PPSA",
+            f"{avg_ppsa_score:.1f}",
+            delta=f"Target: 80.0",
+            delta_type=delta_type,
+            icon="🎯"
+        ), unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(create_metric_card(
+            "Total Tebus Murah",
+            f"{total_tebus_actual:,.0f}",
+            icon="💰"
+        ), unsafe_allow_html=True)
+    
+    with col4:
+        delta_type = "positive" if avg_tebus_acv >= 80 else "warning" if avg_tebus_acv >= 60 else "negative"
+        st.markdown(create_metric_card(
+            "ACV Tebus Murah",
+            f"{avg_tebus_acv:.1f}%",
+            delta="Target: 100%",
+            delta_type=delta_type,
+            icon="📈"
+        ), unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Main Content Tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Analisis PPSA",
+        "💰 Tebus Murah",
+        "📈 Tren & Performa",
+        "🤖 AI Insights",
+        "📄 Raw Data"
+    ])
+    
+    with tab1:
+        st.markdown("### 📊 Analisis PPSA Comprehensive")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.plotly_chart(create_ppsa_radar_chart(filtered_df), use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            # PPSA Score Distribution
+            if 'TOTAL SCORE PPSA (CORRECTED)' in filtered_df.columns:
+                scores = filtered_df['TOTAL SCORE PPSA (CORRECTED)']
+                
+                fig = go.Figure(data=[go.Histogram(
+                    x=scores,
+                    nbinsx=20,
+                    marker_color=COLOR_SCHEME['primary'],
+                    opacity=0.7
+                )])
+                
+                fig.update_layout(
+                    title="<b>🔔 Distribusi Score PPSA</b>",
+                    xaxis_title="Score PPSA",
+                    yaxis_title="Frekuensi",
+                    height=500
+                )
+                
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Cashier Performance Chart
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.plotly_chart(create_shift_comparison_chart(filtered_df), use_container_width=True)
+        st.plotly_chart(create_cashier_performance_chart(filtered_df), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.plotly_chart(create_cashier_performance_chart(filtered_df), use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with tabs[1]:
-    st.subheader("💰 Analisis Tebus Murah")
-    
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.plotly_chart(create_tebus_murah_chart(filtered_df), use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Tambahkan tabel detail performa tebus murah
-    if 'TARGET TEBUS 2500' in filtered_df.columns and 'ACTUAL TEBUS 2500' in filtered_df.columns:
-        tebus_detail = filtered_df.groupby('NAMA KASIR').agg({
-            'TARGET TEBUS 2500': 'sum',
-            'ACTUAL TEBUS 2500': 'sum'
-        }).reset_index()
+    with tab2:
+        st.markdown("### 💰 Analisis Tebus Murah")
         
-        # Hitung ACV
-        tebus_detail['ACV'] = (tebus_detail['ACTUAL TEBUS 2500'] / tebus_detail['TARGET TEBUS 2500'] * 100).round(2)
-        tebus_detail = tebus_detail.sort_values('ACV', ascending=False)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(create_tebus_murah_chart(filtered_df), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        st.subheader("Detail Performa Tebus Murah per Kasir")
-        st.dataframe(tebus_detail, use_container_width=True)
-
-with tabs[2]:
-    st.subheader("📈 Tren Performa")
+        # Detail table
+        if all(col in filtered_df.columns for col in ['TARGET TEBUS 2500', 'ACTUAL TEBUS 2500']):
+            st.markdown("#### 📋 Detail Performa Tebus Murah")
+            
+            tebus_detail = filtered_df.groupby('NAMA KASIR').agg({
+                'TARGET TEBUS 2500': 'sum',
+                'ACTUAL TEBUS 2500': 'sum'
+            }).reset_index()
+            
+            tebus_detail['ACV (%)'] = (tebus_detail['ACTUAL TEBUS 2500'] / tebus_detail['TARGET TEBUS 2500'] * 100).round(2)
+            tebus_detail['Gap'] = tebus_detail['TARGET TEBUS 2500'] - tebus_detail['ACTUAL TEBUS 2500']
+            
+            # Color coding for performance
+            def color_performance(val):
+                if val >= 100:
+                    return f'background-color: {COLOR_SCHEME["success"]}33'
+                elif val >= 80:
+                    return f'background-color: {COLOR_SCHEME["warning"]}33'
+                else:
+                    return f'background-color: {COLOR_SCHEME["danger"]}33'
+            
+            styled_df = tebus_detail.style.applymap(color_performance, subset=['ACV (%)'])
+            st.dataframe(styled_df, use_container_width=True)
     
-    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.plotly_chart(create_trend_chart(filtered_df), use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with tabs[3]:
-    st.subheader("🤖 Analisis AI dengan Gemini")
-    
-    if gemini_model is None:
-        st.error("Model Gemini tidak tersedia. Pastikan API key sudah dikonfigurasi dengan benar.")
-    else:
-        # AI Insights Section
-        st.markdown("### 🧠 Insight Cerdas dari Data")
+    with tab3:
+        st.markdown("### 📈 Tren & Analisis Performa")
         
-        if st.button("🔍 Generate Insight", type="primary"):
-            with st.spinner("Menganalisis data dengan AI..."):
-                insights = generate_ai_insights(filtered_df, gemini_model)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(create_trend_analysis_chart(filtered_df), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Performance correlation matrix
+        if len(filtered_df) > 1:
+            st.markdown("#### 🔗 Korelasi Antar Indikator")
+            
+            corr_cols = []
+            for indicator in ['PSM', 'PWP', 'SG', 'APC']:
+                acv_col = f'{indicator} ACV'
+                if acv_col in filtered_df.columns:
+                    filtered_df[f'{indicator}_numeric'] = pd.to_numeric(
+                        filtered_df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.'),
+                        errors='coerce'
+                    )
+                    corr_cols.append(f'{indicator}_numeric')
+            
+            if len(corr_cols) > 1:
+                correlation_matrix = filtered_df[corr_cols].corr()
                 
-                st.markdown('<div class="ai-response">', unsafe_allow_html=True)
-                st.markdown(insights)
+                fig = px.imshow(
+                    correlation_matrix,
+                    color_continuous_scale='RdBu',
+                    aspect='auto',
+                    labels=dict(color="Korelasi"),
+                    title="<b>🔗 Heatmap Korelasi Indikator PPSA</b>"
+                )
+                
+                st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-
-st.divider()
-
-# =========================================================
-# ------------------- TABEL DETAIL ------------------------
-# =========================================================
-with st.expander("📄 Lihat Data Detail", expanded=False):
-    df_display = filtered_df.copy()
     
-    # Format kolom tanggal
-    if 'TANGGAL' in df_display.columns:
-        df_display['TANGGAL'] = df_display['TANGGAL'].dt.strftime("%Y-%m-%d")
+    with tab4:
+        st.markdown("### 🤖 AI-Powered Business Insights")
+        
+        gemini_model = setup_gemini()
+        
+        if gemini_model is None:
+            st.error("❌ Gemini AI tidak tersedia. Pastikan API key sudah dikonfigurasi.")
+        else:
+            col1, col2 = st.columns([3, 1])
+            
+            with col2:
+                if st.button("🔮 Generate AI Insights", type="primary", use_container_width=True):
+                    with st.spinner("🧠 AI sedang menganalisis data..."):
+                        insights = generate_advanced_insights(filtered_df, gemini_model)
+                        st.session_state['ai_insights'] = insights
+            
+            with col1:
+                st.markdown("Klik tombol untuk mendapatkan analisis mendalam dari AI mengenai performa kasir.")
+            
+            # Display insights if available
+            if 'ai_insights' in st.session_state:
+                st.markdown('<div class="ai-response">', unsafe_allow_html=True)
+                st.markdown(st.session_state['ai_insights'])
+                st.markdown('</div>', unsafe_allow_html=True)
     
-    # Format kolom numerik
-    numeric_cols = ['TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'TOTAL SCORE PPSA']
-    for col in numeric_cols:
-        if col in df_display.columns:
-            df_display[col] = pd.to_numeric(df_display[col], errors='coerce')
+    with tab5:
+        st.markdown("### 📄 Raw Data & Export")
+        
+        # Export functionality
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            # Export to CSV
+            csv = filtered_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name=f"ppsa_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            # Export to Excel
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                filtered_df.to_excel(writer, sheet_name='PPSA Data', index=False)
+            
+            st.download_button(
+                label="📊 Download Excel",
+                data=buffer.getvalue(),
+                file_name=f"ppsa_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        
+        # Data preview
+        st.markdown("#### 👁️ Preview Data")
+        
+        # Show column info
+        st.markdown("**📋 Informasi Kolom:**")
+        col_info = pd.DataFrame({
+            'Kolom': filtered_df.columns,
+            'Tipe Data': filtered_df.dtypes.astype(str),
+            'Non-Null Count': filtered_df.count(),
+            'Null Count': filtered_df.isnull().sum()
+        })
+        st.dataframe(col_info, use_container_width=True)
+        
+        # Show actual data
+        st.markdown("**📊 Data Sample:**")
+        st.dataframe(filtered_df.head(100), use_container_width=True)
     
-    st.dataframe(df_display, use_container_width=True, hide_index=True)
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #64748B; font-size: 0.9rem;">
+        <p>🚀 <strong>Dashboard PPSA & Tebus Murah 2025</strong> | 
+        Powered by <strong>Streamlit</strong> + <strong>Plotly</strong> + <strong>Gemini AI</strong><br>
+        © 2025 Advanced Business Analytics | Designed with ❤️ for better insights</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.caption("© 2025 – Dashboard PPSA & Tebus Murah • Dibangun dengan Streamlit + Plotly • Desain futuristic-glassmorphism")
+if __name__ == "__main__":
+    main()
