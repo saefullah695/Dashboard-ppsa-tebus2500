@@ -27,14 +27,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# BOBOT PPSA - Sesuaikan dengan ketentuan perusahaan
-PPSA_WEIGHTS = {
-    'PSM': 0.25,   # 25%
-    'PWP': 0.30,   # 30%
-    'SG': 0.25,    # 25%
-    'APC': 0.20    # 20%
-}
-
 # Palet warna modern 2025
 COLOR_SCHEME = {
     'primary': '#6366F1',      # Indigo modern
@@ -415,27 +407,6 @@ setup_plotly_theme()
 # =========================================================
 # ------------------- FUNGSI UTILITAS --------------------
 # =========================================================
-def calculate_ppsa_score(row: pd.Series) -> float:
-    """
-    Menghitung total score PPSA berdasarkan bobot yang benar
-    """
-    total_score = 0.0
-    
-    for indicator, weight in PPSA_WEIGHTS.items():
-        acv_col = f'{indicator} ACV'
-        if acv_col in row.index:
-            # Konversi ACV ke numeric (hapus % jika ada)
-            acv_value = str(row[acv_col]).replace('%', '').replace(',', '.')
-            try:
-                acv_numeric = float(acv_value)
-                # ACV dikali bobot
-                weighted_score = acv_numeric * weight
-                total_score += weighted_score
-            except (ValueError, TypeError):
-                continue
-    
-    return round(total_score, 2)
-
 def format_currency(value: float) -> str:
     """Format nilai ke rupiah"""
     try:
@@ -504,8 +475,39 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         if 'TANGGAL' in df.columns:
             df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
         
-        # Hitung ulang total score PPSA dengan bobot yang benar
-        df['TOTAL SCORE PPSA (CORRECTED)'] = df.apply(calculate_ppsa_score, axis=1)
+        # Konversi kolom numerik
+        numeric_cols = [
+            'PSM ACV', 'BOBOT PSM', 'SCORE PSM',
+            'PWP ACV', 'BOBOT PWP', 'SCORE PWP',
+            'SG ACV', 'BOBOT SG', 'SCORE SG',
+            'APC ACV', 'BOBOT APC', 'SCORE APC',
+            'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'ACV TEBUS 2500'
+        ]
+        
+        for col in numeric_cols:
+            if col in df.columns:
+                # Hapus karakter non-numerik seperti % dan koma
+                df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Perbaiki perhitungan total score PPSA jika belum benar
+        if all(col in df.columns for col in ['SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']):
+            df['TOTAL SCORE PPSA (CORRECTED)'] = (
+                df['SCORE PSM'].fillna(0) + 
+                df['SCORE PWP'].fillna(0) + 
+                df['SCORE SG'].fillna(0) + 
+                df['SCORE APC'].fillna(0)
+            )
+        elif all(col in df.columns for col in ['PSM ACV', 'BOBOT PSM', 'PWP ACV', 'BOBOT PWP', 'SG ACV', 'BOBOT SG', 'APC ACV', 'BOBOT APC']):
+            # Hitung score berdasarkan ACV dan bobot jika score belum ada
+            df['TOTAL SCORE PPSA (CORRECTED)'] = (
+                (df['PSM ACV'].fillna(0) * df['BOBOT PSM'].fillna(0)) + 
+                (df['PWP ACV'].fillna(0) * df['BOBOT PWP'].fillna(0)) + 
+                (df['SG ACV'].fillna(0) * df['BOBOT SG'].fillna(0)) + 
+                (df['APC ACV'].fillna(0) * df['BOBOT APC'].fillna(0))
+            )
+        else:
+            df['TOTAL SCORE PPSA (CORRECTED)'] = df['TOTAL SCORE PPSA'].fillna(0)
         
         status_text.text("✅ Data berhasil dimuat!")
         progress_bar.progress(100)
@@ -567,10 +569,7 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
     for indicator in indicators:
         acv_col = f'{indicator} ACV'
         if acv_col in df.columns:
-            # Konversi ke numeric
-            acv_series = df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.')
-            acv_numeric = pd.to_numeric(acv_series, errors='coerce')
-            avg_acv = acv_numeric.mean()
+            avg_acv = df[acv_col].mean()
             
             if not pd.isna(avg_acv):
                 avg_values.append(avg_acv)
@@ -697,12 +696,6 @@ def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
             showarrow=False, font=dict(size=16, color="#64748B")
         )
     
-    # Konversi data
-    for col in available_cols:
-        if 'ACV' in col:
-            df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    
     # Group by kasir
     tebus_data = df.groupby('NAMA KASIR').agg({
         col: 'sum' if 'TARGET' in col or 'ACTUAL' in col else 'mean' 
@@ -776,10 +769,6 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
             xref="paper", yref="paper", x=0.5, y=0.5,
             showarrow=False, font=dict(size=16, color="#64748B")
         )
-    
-    # Konversi kolom score
-    if 'TOTAL SCORE PPSA (CORRECTED)' in df.columns:
-        df['TOTAL SCORE PPSA (CORRECTED)'] = pd.to_numeric(df['TOTAL SCORE PPSA (CORRECTED)'], errors='coerce')
     
     # Group by tanggal
     daily_performance = df.groupby(df['TANGGAL'].dt.date).agg({
@@ -871,15 +860,11 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     indicators_analysis = {}
     for indicator in ['PSM', 'PWP', 'SG', 'APC']:
         acv_col = f'{indicator} ACV'
+        score_col = f'SCORE {indicator}'
         if acv_col in df.columns:
-            acv_series = pd.to_numeric(
-                df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.'),
-                errors='coerce'
-            )
             indicators_analysis[indicator] = {
-                'avg': acv_series.mean(),
-                'weight': PPSA_WEIGHTS[indicator],
-                'contribution': acv_series.mean() * PPSA_WEIGHTS[indicator]
+                'avg_acv': df[acv_col].mean(),
+                'avg_score': df[score_col].mean() if score_col in df.columns else None
             }
     
     # Best and worst performers
@@ -902,14 +887,14 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     - Jumlah Kasir Aktif: {unique_cashiers}
     - Period: {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
 
-    🎯 PERFORMA PPSA (dengan bobot yang benar):
+    🎯 PERFORMA PPSA:
     - Rata-rata Total Score: {ppsa_summary.get('avg_score', 0):.2f}
     - Score Tertinggi: {ppsa_summary.get('max_score', 0):.2f}
     - Score Terendah: {ppsa_summary.get('min_score', 0):.2f}
     - Standar Deviasi: {ppsa_summary.get('std_score', 0):.2f}
 
-    📈 ANALISIS PER INDIKATOR (ACV × Bobot):
-    """ + "\n".join([f"- {indicator}: {data['avg']:.1f}% × {data['weight']*100:.0f}% = {data['contribution']:.2f} poin"
+    📈 ANALISIS PER INDIKATOR:
+    """ + "\n".join([f"- {indicator}: ACV {data['avg_acv']:.1f}%, Score {data['avg_score']:.2f}" if data['avg_score'] else f"- {indicator}: ACV {data['avg_acv']:.1f}%"
                      for indicator, data in indicators_analysis.items()]) + f"""
 
     🏆 PERFORMA KASIR:
@@ -1084,10 +1069,7 @@ def main():
         total_tebus_actual = 0
     
     if 'ACV TEBUS 2500' in filtered_df.columns:
-        avg_tebus_acv = pd.to_numeric(
-            filtered_df['ACV TEBUS 2500'].astype(str).str.replace('%', '').str.replace(',', '.'),
-            errors='coerce'
-        ).mean()
+        avg_tebus_acv = filtered_df['ACV TEBUS 2500'].mean()
     else:
         avg_tebus_acv = 0
     
@@ -1178,6 +1160,22 @@ def main():
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         st.plotly_chart(create_cashier_performance_chart(filtered_df), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Detail Score per Indicator
+        st.markdown("#### 📋 Detail Score per Indikator")
+        
+        score_cols = []
+        for indicator in ['PSM', 'PWP', 'SG', 'APC']:
+            score_col = f'SCORE {indicator}'
+            if score_col in filtered_df.columns:
+                score_cols.append(score_col)
+        
+        if score_cols and 'NAMA KASIR' in filtered_df.columns:
+            score_detail = filtered_df.groupby('NAMA KASIR')[score_cols].mean().reset_index()
+            score_detail['TOTAL SCORE'] = score_detail[score_cols].sum(axis=1)
+            score_detail = score_detail.sort_values('TOTAL SCORE', ascending=False)
+            
+            st.dataframe(score_detail, use_container_width=True)
     
     with tab2:
         st.markdown("### 💰 Analisis Tebus Murah")
@@ -1225,11 +1223,7 @@ def main():
             for indicator in ['PSM', 'PWP', 'SG', 'APC']:
                 acv_col = f'{indicator} ACV'
                 if acv_col in filtered_df.columns:
-                    filtered_df[f'{indicator}_numeric'] = pd.to_numeric(
-                        filtered_df[acv_col].astype(str).str.replace('%', '').str.replace(',', '.'),
-                        errors='coerce'
-                    )
-                    corr_cols.append(f'{indicator}_numeric')
+                    corr_cols.append(acv_col)
             
             if len(corr_cols) > 1:
                 correlation_matrix = filtered_df[corr_cols].corr()
