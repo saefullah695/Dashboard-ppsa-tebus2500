@@ -475,15 +475,26 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         if 'TANGGAL' in df.columns:
             df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
         
-        # Konversi kolom numerik
-        numeric_cols = [
-            'PSM ACV', 'BOBOT PSM', 'SCORE PSM',
-            'PWP ACV', 'BOBOT PWP', 'SCORE PWP',
-            'SG ACV', 'BOBOT SG', 'SCORE SG',
-            'APC ACV', 'BOBOT APC', 'SCORE APC',
-            'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'ACV TEBUS 2500'
+        # Daftar semua kolom ACV yang harus dikonversi sebagai persentase
+        acv_columns = [
+            'PSM ACV', 'PWP ACV', 'SG ACV', 'APC ACV', 'ACV TEBUS 2500'
         ]
         
+        # Daftar kolom numerik lainnya
+        numeric_cols = [
+            'BOBOT PSM', 'SCORE PSM', 'BOBOT PWP', 'SCORE PWP',
+            'BOBOT SG', 'SCORE SG', 'BOBOT APC', 'SCORE APC',
+            'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500'
+        ]
+        
+        # Konversi kolom ACV (semua adalah persentase)
+        for col in acv_columns:
+            if col in df.columns:
+                # Hapus karakter non-numerik seperti % dan koma
+                df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Konversi kolom numerik lainnya
         for col in numeric_cols:
             if col in df.columns:
                 # Hapus karakter non-numerik seperti % dan koma
@@ -592,7 +603,10 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         fill='toself',
         name='Rata-rata ACV (%)',
         line_color=COLOR_SCHEME['primary'],
-        fillcolor=f"rgba(99, 102, 241, 0.3)"
+        fillcolor=f"rgba(99, 102, 241, 0.3)",
+        hovertemplate="<b>%{theta}</b><br>" +
+                     "ACV: %{r:.1f}%<br>" +
+                     "<extra></extra>"
     ))
     
     # Target line (100%)
@@ -603,18 +617,23 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         mode='lines',
         name='Target (100%)',
         line_color=COLOR_SCHEME['success'],
-        line_dash='dash'
+        line_dash='dash',
+        hovertemplate="<b>%{theta}</b><br>" +
+                     "Target: 100%<br>" +
+                     "<extra></extra>"
     ))
     
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, max(120, max(avg_values) * 1.1)]
+                range=[0, max(120, max(avg_values) * 1.1)],
+                ticksuffix="%"
             )
         ),
-        title="<b>📊 Radar Performa PPSA</b>",
-        height=500
+        title="<b>📊 Radar Performa PPSA (ACV %)</b>",
+        height=500,
+        hovermode="closest"
     )
     
     return fig
@@ -718,7 +737,10 @@ def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
                 y=tebus_data['TARGET TEBUS 2500'],
                 name='Target',
                 marker_color=COLOR_SCHEME['info'],
-                opacity=0.7
+                opacity=0.7,
+                hovertemplate="<b>%{x}</b><br>" +
+                             "Target: %{y:,.0f} items<br>" +
+                             "<extra></extra>"
             ),
             secondary_y=False
         )
@@ -730,7 +752,10 @@ def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
                 y=tebus_data['ACTUAL TEBUS 2500'],
                 name='Actual',
                 marker_color=COLOR_SCHEME['success'],
-                opacity=0.8
+                opacity=0.8,
+                hovertemplate="<b>%{x}</b><br>" +
+                             "Actual: %{y:,.0f} items<br>" +
+                             "<extra></extra>"
             ),
             secondary_y=False
         )
@@ -744,14 +769,17 @@ def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
                 mode='lines+markers',
                 name='ACV (%)',
                 line=dict(color=COLOR_SCHEME['accent'], width=3),
-                marker=dict(size=8)
+                marker=dict(size=8),
+                hovertemplate="<b>%{x}</b><br>" +
+                             "ACV: %{y:.1f}%<br>" +
+                             "<extra></extra>"
             ),
             secondary_y=True
         )
     
     fig.update_xaxes(title_text="Nama Kasir")
     fig.update_yaxes(title_text="Jumlah Item", secondary_y=False)
-    fig.update_yaxes(title_text="ACV (%)", secondary_y=True)
+    fig.update_yaxes(title_text="ACV (%)", ticksuffix="%", secondary_y=True)
     
     fig.update_layout(
         height=500,
@@ -793,7 +821,10 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         line=dict(color=COLOR_SCHEME['primary'], width=2),
         marker=dict(size=6),
         fill='tonexty',
-        fillcolor=f"rgba(99, 102, 241, 0.1)"
+        fillcolor=f"rgba(99, 102, 241, 0.1)",
+        hovertemplate="<b>%{x}</b><br>" +
+                     "Score: %{y:.1f}<br>" +
+                     "<extra></extra>"
     ))
     
     # Moving averages
@@ -802,7 +833,10 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         y=daily_performance['MA_3'],
         mode='lines',
         name='MA 3 Hari',
-        line=dict(color=COLOR_SCHEME['secondary'], width=2, dash='dot')
+        line=dict(color=COLOR_SCHEME['secondary'], width=2, dash='dot'),
+        hovertemplate="<b>%{x}</b><br>" +
+                     "MA 3 Hari: %{y:.1f}<br>" +
+                     "<extra></extra>"
     ))
     
     fig.add_trace(go.Scatter(
@@ -810,7 +844,10 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         y=daily_performance['MA_7'],
         mode='lines',
         name='MA 7 Hari',
-        line=dict(color=COLOR_SCHEME['success'], width=3, dash='dash')
+        line=dict(color=COLOR_SCHEME['success'], width=3, dash='dash'),
+        hovertemplate="<b>%{x}</b><br>" +
+                     "MA 7 Hari: %{y:.1f}<br>" +
+                     "<extra></extra>"
     ))
     
     fig.update_layout(
@@ -820,6 +857,68 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         height=500,
         hovermode='x unified'
     )
+    
+    return fig
+
+def create_acv_comparison_chart(df: pd.DataFrame) -> go.Figure:
+    """Chart perbandingan ACV semua indikator"""
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="Tidak ada data untuk ditampilkan",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
+    # Daftar semua kolom ACV
+    acv_columns = []
+    for col in df.columns:
+        if 'ACV' in col and df[col].dtype in ['float64', 'int64']:
+            acv_columns.append(col)
+    
+    if not acv_columns:
+        return go.Figure().add_annotation(
+            text="Data ACV tidak tersedia",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16, color="#64748B")
+        )
+    
+    # Hitung rata-rata untuk setiap ACV
+    acv_averages = []
+    for col in acv_columns:
+        avg_val = df[col].mean()
+        if not pd.isna(avg_val):
+            acv_averages.append(avg_val)
+        else:
+            acv_averages.append(0)
+    
+    # Buat bar chart
+    colors = [COLOR_SCHEME['primary'], COLOR_SCHEME['secondary'], COLOR_SCHEME['success'], 
+              COLOR_SCHEME['warning'], COLOR_SCHEME['info']][:len(acv_columns)]
+    
+    fig = go.Figure(data=[
+        go.Bar(
+            x=acv_columns,
+            y=acv_averages,
+            marker_color=colors,
+            text=[f"{val:.1f}%" for val in acv_averages],
+            textposition='auto',
+            hovertemplate="<b>%{x}</b><br>" +
+                         "Rata-rata ACV: %{y:.1f}%<br>" +
+                         "<extra></extra>"
+        )
+    ])
+    
+    fig.update_layout(
+        title="<b>📊 Perbandingan Rata-rata ACV Semua Indikator</b>",
+        xaxis_title="Indikator ACV",
+        yaxis_title="Rata-rata ACV (%)",
+        yaxis_ticksuffix="%",
+        height=500
+    )
+    
+    # Tambahkan garis target 100%
+    fig.add_hline(y=100, line_dash="dash", line_color=COLOR_SCHEME['danger'], 
+                  annotation_text="Target (100%)")
     
     return fig
 
@@ -867,6 +966,9 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
                 'avg_score': df[score_col].mean() if score_col in df.columns else None
             }
     
+    # Analisis ACV Tebus Murah
+    tebus_murah_acv = df['ACV TEBUS 2500'].mean() if 'ACV TEBUS 2500' in df.columns else 0
+    
     # Best and worst performers
     if 'NAMA KASIR' in df.columns and 'TOTAL SCORE PPSA (CORRECTED)' in df.columns:
         cashier_performance = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA (CORRECTED)'].mean()
@@ -893,9 +995,12 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     - Score Terendah: {ppsa_summary.get('min_score', 0):.2f}
     - Standar Deviasi: {ppsa_summary.get('std_score', 0):.2f}
 
-    📈 ANALISIS PER INDIKATOR:
+    📈 ANALISIS PER INDIKATOR (SEMUA DALAM %):
     """ + "\n".join([f"- {indicator}: ACV {data['avg_acv']:.1f}%, Score {data['avg_score']:.2f}" if data['avg_score'] else f"- {indicator}: ACV {data['avg_acv']:.1f}%"
                      for indicator, data in indicators_analysis.items()]) + f"""
+    
+    💰 TEBUS MURAH:
+    - ACV Tebus Murah: {tebus_murah_acv:.1f}%
 
     🏆 PERFORMA KASIR:
     - Terbaik: {best_performer} ({best_score:.2f} poin)
@@ -923,6 +1028,13 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     - Correlation antara performa kasir dengan faktor lain
     - Benchmark industry jika applicable
     - Prediksi dampak jika rekomendasi dijalankan
+
+    **CATATAN PENTING:**
+    - Semua nilai ACV adalah persentase (%)
+    - PSM = Promo Spesial Mingguan
+    - PWP = Purchase With Purchase
+    - SG = Serba Gratis
+    - APC = Average Purchase Customer
 
     Format response dalam bahasa Indonesia yang profesional namun engaging, gunakan emoji untuk memperjelas poin-poin penting.
     """
@@ -1132,11 +1244,12 @@ def main():
             **PPSA (Program Penjualan Sales Assistant)** adalah kumpulan indikator performa penjualan yang terdiri dari:
             
             - **PSM (Promo Spesial Mingguan)**: Program promosi yang dijalankan mingguan
-            - **PWP (Purchase With Purchase)**: Program beli gratis/beli dapat bonus
+            - **PWP (Purchase With Purchase)**: Program beli gratis/beli dapat bonus  
             - **SG (Serba Gratis)**: Program produk gratis
             - **APC (Average Purchase Customer)**: Rata-rata nilai pembelian per pelanggan
             
             **ACV (Actual vs Target)** adalah persentase pencapaian terhadap target yang ditetapkan.
+            Semua kolom ACV adalah nilai persentase (%).
             """)
         
         col1, col2 = st.columns(2)
@@ -1155,7 +1268,11 @@ def main():
                     x=scores,
                     nbinsx=20,
                     marker_color=COLOR_SCHEME['primary'],
-                    opacity=0.7
+                    opacity=0.7,
+                    hovertemplate="<b>Score PPSA</b><br>" +
+                                 "Range: %{x:.1f} - %{y:.1f}<br>" +
+                                 "Frekuensi: %{y}<br>" +
+                                 "<extra></extra>"
                 )])
                 
                 fig.update_layout(
@@ -1189,6 +1306,11 @@ def main():
             score_detail = score_detail.sort_values('TOTAL SCORE', ascending=False)
             
             st.dataframe(score_detail, use_container_width=True)
+        
+        # ACV Comparison Chart
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.plotly_chart(create_acv_comparison_chart(filtered_df), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with tab2:
         st.markdown("### 💰 Analisis Tebus Murah")
@@ -1230,13 +1352,17 @@ def main():
         
         # Performance correlation matrix
         if len(filtered_df) > 1:
-            st.markdown("#### 🔗 Korelasi Antar Indikator")
+            st.markdown("#### 🔗 Korelasi Antar Indikator ACV")
             
             corr_cols = []
             for indicator in ['PSM', 'PWP', 'SG', 'APC']:
                 acv_col = f'{indicator} ACV'
                 if acv_col in filtered_df.columns:
                     corr_cols.append(acv_col)
+            
+            # Tambahkan ACV TEBUS 2500 jika ada
+            if 'ACV TEBUS 2500' in filtered_df.columns:
+                corr_cols.append('ACV TEBUS 2500')
             
             if len(corr_cols) > 1:
                 correlation_matrix = filtered_df[corr_cols].corr()
@@ -1246,7 +1372,8 @@ def main():
                     color_continuous_scale='RdBu',
                     aspect='auto',
                     labels=dict(color="Korelasi"),
-                    title="<b>🔗 Heatmap Korelasi Indikator PPSA</b>"
+                    title="<b>🔗 Heatmap Korelasi Semua Indikator ACV (%)</b>",
+                    text_auto=True
                 )
                 
                 st.markdown('<div class="chart-container">', unsafe_allow_html=True)
