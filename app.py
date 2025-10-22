@@ -484,20 +484,40 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         numeric_cols = [
             'BOBOT PSM', 'SCORE PSM', 'BOBOT PWP', 'SCORE PWP',
             'BOBOT SG', 'SCORE SG', 'BOBOT APC', 'SCORE APC',
-            'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500'
+            'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'JHK'
         ]
         
-        # Konversi kolom ACV (semua adalah persentase)
+        # --- PERBAIKAN UTAMA: PENANGANAN DATA PERSENTASE ---
+        # Fungsi untuk membersihkan dan mengkonversi kolom persentase
+        def convert_percentage_column(series: pd.Series) -> pd.Series:
+            """Konversi kolom persentase dari berbagai format ke angka float 0-100"""
+            # Konversi ke string dulu untuk handling yang konsisten
+            series = series.astype(str)
+            
+            # Hapus karakter non-numerik kecuali titik dan koma
+            series = series.str.replace('%', '', regex=False)
+            series = series.str.replace('[^\d.,-]', '', regex=True)
+            
+            # Ganti koma dengan titik untuk desimal
+            series = series.str.replace(',', '.', regex=False)
+            
+            # Konversi ke numeric
+            numeric_series = pd.to_numeric(series, errors='coerce')
+            
+            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100
+            # Kondisi: nilai > 0 dan nilai < 1
+            numeric_series = numeric_series.apply(lambda x: x * 100 if 0 < x < 1 else x)
+            
+            return numeric_series
+        
+        # Konversi kolom ACV dengan fungsi baru
         for col in acv_columns:
             if col in df.columns:
-                # Hapus karakter non-numerik seperti % dan koma
-                df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = convert_percentage_column(df[col])
         
-        # Konversi kolom numerik lainnya
+        # Konversi kolom numerik lainnya (tanpa logika persentase)
         for col in numeric_cols:
             if col in df.columns:
-                # Hapus karakter non-numerik seperti % dan koma
                 df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
@@ -510,7 +530,6 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
                 df['SCORE APC'].fillna(0)
             )
         elif all(col in df.columns for col in ['PSM ACV', 'BOBOT PSM', 'PWP ACV', 'BOBOT PWP', 'SG ACV', 'BOBOT SG', 'APC ACV', 'BOBOT APC']):
-            # Hitung score berdasarkan ACV dan bobot jika score belum ada
             df['TOTAL SCORE PPSA (CORRECTED)'] = (
                 (df['PSM ACV'].fillna(0) * df['BOBOT PSM'].fillna(0)) + 
                 (df['PWP ACV'].fillna(0) * df['BOBOT PWP'].fillna(0)) + 
@@ -652,7 +671,7 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
         'mean', 'count'
     ]).reset_index()
     
-    cashier_performance.columns = ['NAMA KASIR', 'Rata_rata_Score', 'Jumlah_Transaksi']
+    cashier_performance.columns = ['NAMA KASIR', 'Rata_rata_Score', 'Jumlah_Laporan']
     cashier_performance = cashier_performance.sort_values('Rata_rata_Score', ascending=True)
     
     # Tentukan warna berdasarkan performa
@@ -674,9 +693,9 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
         textposition='auto',
         hovertemplate="<b>%{y}</b><br>" +
                      "Score: %{x:.1f}<br>" +
-                     "Transaksi: %{customdata}<br>" +
+                     "Jumlah Laporan: %{customdata}<br>" +
                      "<extra></extra>",
-        customdata=cashier_performance['Jumlah_Transaksi']
+        customdata=cashier_performance['Jumlah_Laporan']
     ))
     
     fig.update_layout(
@@ -804,7 +823,7 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         'NAMA KASIR': 'nunique'
     }).reset_index()
     
-    daily_performance.columns = ['Tanggal', 'Avg_Score', 'Total_Transaksi', 'Jumlah_Kasir']
+    daily_performance.columns = ['Tanggal', 'Avg_Score', 'Total_Laporan', 'Jumlah_Kasir']
     
     # Hitung moving average
     daily_performance['MA_3'] = daily_performance['Avg_Score'].rolling(3, min_periods=1).mean()
@@ -943,6 +962,7 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     # Siapkan data summary untuk AI
     total_records = len(df)
     unique_cashiers = df['NAMA KASIR'].nunique() if 'NAMA KASIR' in df.columns else 0
+    total_hari_kerja = df['JHK'].sum() if 'JHK' in df.columns else 0
     
     # Analisis PPSA
     ppsa_summary = {}
@@ -985,8 +1005,9 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     Sebagai seorang Business Intelligence Analyst expert, analisis data performa kasir PPSA berikut:
 
     📊 RINGKASAN DATA:
-    - Total Transaksi: {total_records:,}
+    - Total Laporan/Entri: {total_records:,}
     - Jumlah Kasir Aktif: {unique_cashiers}
+    - Total Hari Kerja (JHK): {total_hari_kerja:,.0f}
     - Period: {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
 
     🎯 PERFORMA PPSA:
@@ -1030,7 +1051,10 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     - Prediksi dampak jika rekomendasi dijalankan
 
     **CATATAN PENTING:**
-    - Semua nilai ACV adalah persentase (%)
+    - Data ini adalah data teragregasi per periode (harian/mingguan/bulanan).
+    - Total Records adalah jumlah laporan, bukan jumlah transaksi individual.
+    - JHK adalah Jumlah Hari Kerja.
+    - Semua nilai ACV adalah persentase (%).
     - PSM = Promo Spesial Mingguan
     - PWP = Purchase With Purchase
     - SG = Serba Gratis
@@ -1121,6 +1145,7 @@ def render_sidebar(df: pd.DataFrame) -> Dict:
             st.info(f"""
             **Total Records:** {len(df):,}  
             **Kasir Aktif:** {df['NAMA KASIR'].nunique() if 'NAMA KASIR' in df.columns else 'N/A'}  
+            **Total Hari Kerja:** {df['JHK'].sum():,.0f} if 'JHK' in df.columns else 'N/A'}  
             **Periode:** {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
             """)
         
@@ -1171,8 +1196,14 @@ def main():
     st.markdown("## 📊 Key Performance Indicators")
     
     # Calculate metrics
-    total_transactions = len(filtered_df)
+    total_records = len(filtered_df)
     avg_ppsa_score = filtered_df['TOTAL SCORE PPSA (CORRECTED)'].mean() if 'TOTAL SCORE PPSA (CORRECTED)' in filtered_df.columns else 0
+    
+    # Calculate Total Hari Kerja (JHK)
+    if 'JHK' in filtered_df.columns:
+        total_hari_kerja = filtered_df['JHK'].sum()
+    else:
+        total_hari_kerja = 0
     
     # Tebus Murah metrics
     if 'ACTUAL TEBUS 2500' in filtered_df.columns:
@@ -1192,9 +1223,9 @@ def main():
     
     with col1:
         st.markdown(create_metric_card(
-            "Total Transaksi",
-            f"{total_transactions:,}",
-            icon="📋"
+            "Total Hari Kerja (JHK)",
+            f"{total_hari_kerja:,.0f}",
+            icon="📅"
         ), unsafe_allow_html=True)
     
     with col2:
@@ -1250,6 +1281,8 @@ def main():
             
             **ACV (Actual vs Target)** adalah persentase pencapaian terhadap target yang ditetapkan.
             Semua kolom ACV adalah nilai persentase (%).
+            
+            **Catatan Penting:** Data ini adalah data teragregasi per periode. Jumlah baris data mewakili jumlah laporan, bukan jumlah transaksi individual.
             """)
         
         col1, col2 = st.columns(2)
