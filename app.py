@@ -590,7 +590,7 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         r=avg_values,
         theta=labels,
         fill='toself',
-        name='Rata-rata ACV',
+        name='Rata-rata ACV (%)',
         line_color=COLOR_SCHEME['primary'],
         fillcolor=f"rgba(99, 102, 241, 0.3)"
     ))
@@ -1125,6 +1125,19 @@ def main():
     
     with tab1:
         st.markdown("### 📊 Analisis PPSA Comprehensive")
+        
+        # Informasi PPSA
+        with st.expander("ℹ️ Informasi Tentang Indikator PPSA", expanded=False):
+            st.markdown("""
+            **PPSA (Program Penjualan Sales Assistant)** adalah kumpulan indikator performa penjualan yang terdiri dari:
+            
+            - **PSM (Promo Spesial Mingguan)**: Program promosi yang dijalankan mingguan
+            - **PWP (Purchase With Purchase)**: Program beli gratis/beli dapat bonus
+            - **SG (Serba Gratis)**: Program produk gratis
+            - **APC (Average Purchase Customer)**: Rata-rata nilai pembelian per pelanggan
+            
+            **ACV (Actual vs Target)** adalah persentase pencapaian terhadap target yang ditetapkan.
+            """)
         
         col1, col2 = st.columns(2)
         
