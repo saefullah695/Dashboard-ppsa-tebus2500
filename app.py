@@ -1141,12 +1141,21 @@ def render_sidebar(df: pd.DataFrame) -> Dict:
         
         # Data info
         if not df.empty:
+            # --- PERBAIKAN ERROR F-STRING ---
+            # Hitung nilai-nilai terlebih dahulu sebelum memasukkannya ke f-string
+            total_records_count = f"{len(df):,}"
+            kasir_aktif_count = f"{df['NAMA KASIR'].nunique()}" if 'NAMA KASIR' in df.columns else 'N/A'
+            total_hari_kerja_str = f"{df['JHK'].sum():,.0f}" if 'JHK' in df.columns else 'N/A'
+            
+            periode_start = df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'
+            periode_end = df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'
+            
             st.markdown("### 📋 Data Info")
             st.info(f"""
-            **Total Records:** {len(df):,}  
-            **Kasir Aktif:** {df['NAMA KASIR'].nunique() if 'NAMA KASIR' in df.columns else 'N/A'}  
-            **Total Hari Kerja:** {df['JHK'].sum():,.0f} if 'JHK' in df.columns else 'N/A'}  
-            **Periode:** {df['TANGGAL'].min().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'} - {df['TANGGAL'].max().strftime('%d/%m/%Y') if 'TANGGAL' in df.columns else 'N/A'}
+            **Total Records:** {total_records_count}  
+            **Kasir Aktif:** {kasir_aktif_count}  
+            **Total Hari Kerja:** {total_hari_kerja_str}  
+            **Periode:** {periode_start} - {periode_end}
             """)
         
         return {'spreadsheet_url': spreadsheet_url, 'sheet_name': sheet_name, **filters}
