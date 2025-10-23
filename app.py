@@ -146,8 +146,8 @@ def get_gemini_insight(data_summary):
 
 # --- Sidebar untuk Filter ---
 st.sidebar.title("⚙️ Filter Data")
-# Ganti dengan nama spreadsheet dan worksheet Anda
-SHEET_NAME = "NAMA_SPREADSHEET_ANDA" 
+# Nama spreadsheet dan worksheet sudah diperbarui
+SHEET_NAME = "PesanOtomatis" 
 WORKSHEET_NAME = "Data"
 
 df = load_data(SHEET_NAME, WORKSHEET_NAME)
