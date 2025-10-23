@@ -74,7 +74,7 @@ st.markdown("""
 # --- Fungsi untuk Memuat Data dari Google Sheets ---
 @st.cache_data(ttl=600)
 def load_data(sheet_name, worksheet_name, debug_mode=False):
-    """Memuat data dari Google Sheets dengan penanganan error dan logging."""
+    """Memuat dan memproses data, termasuk menghitung skor PPSA."""
     if debug_mode:
         st.info("🔍 **DEBUG MODE AKTIF**")
         st.write("1. Mencoba menghubungkan ke Google Sheets...")
@@ -96,12 +96,9 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
         if debug_mode:
             st.success(f"   ✅ Spreadsheet dan worksheet '{worksheet_name}' ditemukan.")
             st.write("3. Memproses data...")
-            st.write("   - Kolom yang ditemukan:", df.columns.tolist())
-            st.write("   - 5 baris pertama data mentah:")
-            st.dataframe(df.head())
 
-        # --- Validasi Kolom Wajib ---
-        required_cols = ['TANGGAL', 'SHIFT', 'PSM Actual', 'PWP Actual', 'SG Actual', 'APC Actual', 'TOTAL SCORE PPSA']
+        # --- PERUBAHAN: Validasi Kolom Wajib (Termasuk Target) ---
+        required_cols = ['TANGGAL', 'SHIFT', 'PSM Target', 'PSM Actual', 'PWP Target', 'PWP Actual', 'SG Target', 'SG Actual', 'APC Target', 'APC Actual']
         if not all(col in df.columns for col in required_cols):
             missing_cols = [col for col in required_cols if col not in df.columns]
             st.error(f"❌ **Error Validasi Kolom:** Kolom berikut tidak ditemukan: {', '.join(missing_cols)}. Periksa ejaan header di Google Sheet Anda.")
@@ -113,28 +110,47 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
 
         numeric_cols = [
             'PSM Target', 'PSM Actual', 'PWP Target', 'PWP Actual', 'SG Target', 'SG Actual',
-            'APC Target', 'APC Actual', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'TOTAL SCORE PPSA'
+            'APC Target', 'APC Actual', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500'
         ]
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # --- PERUBAHAN: Perhitungan Skor PPSA Berdasarkan Bobot ---
+        # Definisi Bobot
+        bobot_psm = 0.20
+        bobot_pwp = 0.25
+        bobot_sg = 0.30
+        bobot_apc = 0.25
+
+        # Fungsi helper untuk menghitung achievement (ACV)
+        def hitung_acv(actual, target):
+            acv = (actual / target) * 100
+            return acv.clip(upper=100) # Maksimal skor adalah 100
+
+        # Hitung ACV untuk setiap metrik
+        df['PSM ACV'] = df.apply(lambda row: hitung_acv(row['PSM Actual'], row['PSM Target']) if row['PSM Target'] > 0 else 0, axis=1)
+        df['PWP ACV'] = df.apply(lambda row: hitung_acv(row['PWP Actual'], row['PWP Target']) if row['PWP Target'] > 0 else 0, axis=1)
+        df['SG ACV'] = df.apply(lambda row: hitung_acv(row['SG Actual'], row['SG Target']) if row['SG Target'] > 0 else 0, axis=1)
+        df['APC ACV'] = df.apply(lambda row: hitung_acv(row['APC Actual'], row['APC Target']) if row['APC Target'] > 0 else 0, axis=1)
+
+        # Hitung skor per komponen
+        df['SCORE PSM'] = df['PSM ACV'] * bobot_psm
+        df['SCORE PWP'] = df['PWP ACV'] * bobot_pwp
+        df['SCORE SG'] = df['SG ACV'] * bobot_sg
+        df['SCORE APC'] = df['APC ACV'] * bobot_apc
+
+        # Hitung Total Skor PPSA
+        df['TOTAL SCORE PPSA'] = df['SCORE PSM'] + df['SCORE PWP'] + df['SCORE SG'] + df['SCORE APC']
+
         if debug_mode:
-            st.success("   ✅ Data berhasil diproses dan dibersihkan.")
+            st.success("   ✅ Data berhasil diproses dan skor PPSA dihitung.")
+            st.write("   - 5 baris pertama data setelah perhitungan:")
+            st.dataframe(df.head())
         
         return df
 
-    except gspread.exceptions.SpreadsheetNotFound:
-        st.error(f"❌ **Error:** Spreadsheet dengan nama '{sheet_name}' tidak ditemukan. Periksa nama dan pastikan Service Account sudah di-share.")
-        if debug_mode:
-            st.write("   **Solusi:** Pastikan nama spreadsheet di kode sama persis dengan nama di Google Sheets. Cek juga apakah email Service Account sudah diberi akses 'Editor'.")
-        return pd.DataFrame()
-    except gspread.exceptions.WorksheetNotFound:
-        st.error(f"❌ **Error:** Worksheet dengan nama '{worksheet_name}' tidak ditemukan.")
-        if debug_mode:
-            st.write(f"   **Solusi:** Pastikan ada worksheet (tab) dengan nama '{worksheet_name}' di dalam spreadsheet Anda.")
-        return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ **Error Tak Terduga:** {e}")
         return pd.DataFrame()
@@ -154,8 +170,6 @@ def get_gemini_insight(data_summary, debug_mode=False):
         return response.text
     except Exception as e:
         st.error(f"❌ **Error AI:** Tidak dapat mengambil insight. Periksa API Key Gemini. Detail: {e}")
-        if debug_mode:
-            st.write("   **Solusi:** Pastikan `api_key` di `secrets.toml` benar dan API aktif.")
         return f"Tidak dapat mengambil insight dari AI."
 
 # --- Sidebar untuk Filter ---
@@ -196,7 +210,8 @@ if not df.empty:
     total_psm_actual = filtered_df['PSM Actual'].sum()
     total_pwp_actual = filtered_df['PWP Actual'].sum()
     total_sg_actual = filtered_df['SG Actual'].sum()
-    total_apc_actual = filtered_df['APC Actual'].sum()
+    # PERUBAHAN: APC dihitung rata-rata
+    avg_apc_actual = filtered_df['APC Actual'].mean()
 
     # Fungsi helper untuk memformat angka
     def format_number(num):
@@ -210,7 +225,8 @@ if not df.empty:
     with col3:
         st.markdown(f'<div class="metric-card metric-sg"><div class="metric-label">SG</div><div class="metric-value">{format_number(total_sg_actual)}</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f'<div class="metric-card metric-apc"><div class="metric-label">APC</div><div class="metric-value">{format_number(total_apc_actual)}</div></div>', unsafe_allow_html=True)
+        # PERUBAHAN: Label dan nilai untuk APC
+        st.markdown(f'<div class="metric-card metric-apc"><div class="metric-label">APC (Rata-rata)</div><div class="metric-value">{format_number(avg_apc_actual)}</div></div>', unsafe_allow_html=True)
 
     st.markdown("---")
     
@@ -235,7 +251,14 @@ if not df.empty:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.markdown("**PPSA per Shift**")
-        table_shift = filtered_df.groupby('SHIFT')[['PSM Actual', 'PWP Actual', 'SG Actual', 'APC Actual', 'TOTAL SCORE PPSA']].sum().reset_index()
+        # PERUBAHAN: Agregasi untuk APC adalah rata-rata
+        table_shift = filtered_df.groupby('SHIFT').agg(
+            PSM_Actual=('PSM Actual', 'sum'),
+            PWP_Actual=('PWP Actual', 'sum'),
+            SG_Actual=('SG Actual', 'sum'),
+            APC_Actual=('APC Actual', 'mean'), # Rata-rata
+            Total_Score_PPSA=('TOTAL SCORE PPSA', 'sum')
+        ).reset_index()
         st.dataframe(table_shift, use_container_width=True, hide_index=True)
     with col_t2:
         st.markdown("**PPSA & Tebus 2500**")
@@ -243,10 +266,17 @@ if not df.empty:
         st.dataframe(table_tebus, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    
+
+    # --- PERUBAHAN: Tambahkan Tabel Detail Skor ---
+    with st.expander("🔢 Lihat Detail Perhitungan Skor"):
+        st.markdown("**Tabel Detail Skor per Komponen**")
+        detail_cols = ['SHIFT', 'PSM ACV', 'SCORE PSM', 'PWP ACV', 'SCORE PWP', 'SG ACV', 'SCORE SG', 'APC ACV', 'SCORE APC', 'TOTAL SCORE PPSA']
+        st.dataframe(filtered_df[detail_cols], use_container_width=True, hide_index=True)
+
     # --- Bagian 4: Insight dari AI ---
     st.subheader("🤖 Insight dari Gemini AI")
-    summary = f"Periode: {start_date} hingga {end_date}, Shift: {selected_shift}, PSM: {total_psm_actual}, PWP: {total_pwp_actual}, SG: {total_sg_actual}, APC: {total_apc_actual}."
+    # PERUBAHAN: Ringkasan data mencakup APC rata-rata
+    summary = f"Periode: {start_date} hingga {end_date}, Shift: {selected_shift}. PSM Total: {total_psm_actual}, PWP Total: {total_pwp_actual}, SG Total: {total_sg_actual}, APC Rata-rata: {avg_apc_actual}."
     with st.spinner("Sedang menganalisis data..."):
         insight = get_gemini_insight(summary, debug_mode)
     st.info(insight)
