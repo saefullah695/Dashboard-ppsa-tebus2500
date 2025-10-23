@@ -504,12 +504,17 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             # Konversi ke numeric
             numeric_series = pd.to_numeric(series, errors='coerce')
             
-            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100
-            # Kondisi: nilai > 0 dan nilai < 1
+            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100.
+            # Kondisi: nilai > 0 dan nilai < 1.
+            # Ini adalah standar untuk menangani data yang tidak konsisten.
+            # Nilai seperti 1.3 (dari 1,3) akan tetap 1.3, bukan 130, untuk menghindari kesalahan pada data yang sudah benar (misal 60).
             numeric_series = numeric_series.apply(lambda x: x * 100 if 0 < x < 1 else x)
             
-            # --- PERBAIKAN: Batasi nilai maksimal menjadi 100% ---
-            numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
+            # --- PERBAIKAN: HAPUS BATASAN 100% ---
+            # Kami menghapus pembatasan nilai maksimal 100%.
+            # Ini memungkinkan Anda melihat data yang salah input (misal 130%) dan memperbaikinya di sumber.
+            # Jika Anda ingin membatasi nilai, Anda bisa mengaktifkan kembali baris di bawah ini:
+            # numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
             
             return numeric_series
         
@@ -524,8 +529,10 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
                 df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Perbaiki perhitungan total score PPSA jika belum benar
+        # --- PERBAIKAN UTAMA: PERHITUNGAN TOTAL SCORE PPSA ---
+        # Perbaiki perhitungan total score PPSA dengan rumus RATA-RATA BERBOBOT yang benar.
         if all(col in df.columns for col in ['SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']):
+            # Jika kolom SCORE sudah ada, gunakan nilai tersebut
             df['TOTAL SCORE PPSA (CORRECTED)'] = (
                 df['SCORE PSM'].fillna(0) + 
                 df['SCORE PWP'].fillna(0) + 
@@ -533,12 +540,26 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
                 df['SCORE APC'].fillna(0)
             )
         elif all(col in df.columns for col in ['PSM ACV', 'BOBOT PSM', 'PWP ACV', 'BOBOT PWP', 'SG ACV', 'BOBOT SG', 'APC ACV', 'BOBOT APC']):
-            df['TOTAL SCORE PPSA (CORRECTED)'] = (
-                (df['PSM ACV'].fillna(0) * df['BOBOT PSM'].fillna(0)) + 
-                (df['PWP ACV'].fillna(0) * df['BOBOT PWP'].fillna(0)) + 
-                (df['SG ACV'].fillna(0) * df['BOBOT SG'].fillna(0)) + 
-                (df['APC ACV'].fillna(0) * df['BOBOT APC'].fillna(0))
-            )
+            # Jika tidak ada kolom SCORE, hitung dari ACV dan BOBOT dengan rumus RATA-RATA BERBOBOT
+            indicators = ['PSM', 'PWP', 'SG', 'APC']
+            acv_cols = [f'{ind} ACV' for ind in indicators]
+            weight_cols = [f'{ind} BOBOT' for ind in indicators]
+            
+            # Pastikan semua kolom yang dibutuhkan ada
+            if all(col in df.columns for col in acv_cols + weight_cols):
+                # Hitung jumlah bobot per baris untuk menghindari kesalahan jika ada bobot yang kosong
+                total_bobot = df[weight_cols].fillna(0).sum(axis=1)
+                
+                # Hitung jumlah dari (ACV * BOBOT) per baris
+                weighted_sum = (df[acv_cols].fillna(0) * df[weight_cols].fillna(0)).sum(axis=1)
+                
+                # Hindari pembagian dengan nol. Jika total bobot 0, score menjadi 0.
+                df['TOTAL SCORE PPSA (CORRECTED)'] = weighted_sum / total_bobot.replace(0, np.nan)
+                
+                # Isi nilai NaN (hasil dari pembagian 0/0) dengan 0
+                df['TOTAL SCORE PPSA (CORRECTED)'] = df['TOTAL SCORE PPSA (CORRECTED)'].fillna(0)
+            else:
+                df['TOTAL SCORE PPSA (CORRECTED)'] = 0 # Default jika kolom tidak lengkap
         else:
             df['TOTAL SCORE PPSA (CORRECTED)'] = df['TOTAL SCORE PPSA'].fillna(0)
         
