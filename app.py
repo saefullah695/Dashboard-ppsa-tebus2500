@@ -1495,9 +1495,20 @@ def main():
         })
         st.dataframe(col_info, use_container_width=True)
         
-        # Show actual data
+        # --- PERBAIKAN KHUSUS UNTUK TAMPILAN RAW DATA ---
         st.markdown("**📊 Data Sample:**")
-        st.dataframe(filtered_df.head(100), use_container_width=True)
+        # Buat salinan df hanya untuk keperluan display
+        display_df = filtered_df.copy()
+        # Identifikasi kolom ACV
+        acv_cols_to_format = [col for col in display_df.columns if 'ACV' in col]
+        
+        # Format kolom ACV menjadi string dengan simbol %
+        for col in acv_cols_to_format:
+            # Pastikan kolom ada dan bertipe numerik sebelum diformat
+            if pd.api.types.is_numeric_dtype(display_df[col]):
+                display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+        
+        st.dataframe(display_df.head(100), use_container_width=True)
     
     # Footer
     st.markdown("---")
