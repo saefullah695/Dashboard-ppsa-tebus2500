@@ -74,7 +74,7 @@ st.markdown("""
 # --- Fungsi untuk Memuat Data dari Google Sheets ---
 @st.cache_data(ttl=600)
 def load_data(sheet_name, worksheet_name, debug_mode=False):
-    """Memuat dan memproses data, termasuk menghitung skor PPSA."""
+    """Memuat dan membersihkan data mentah dari Google Sheets."""
     if debug_mode:
         st.info("🔍 **DEBUG MODE AKTIF**")
         st.write("1. Mencoba menghubungkan ke Google Sheets...")
@@ -84,10 +84,6 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
         client = gspread.authorize(creds)
         
-        if debug_mode:
-            st.success("   ✅ Koneksi ke Google Cloud berhasil.")
-            st.write(f"2. Mencoba membuka spreadsheet: '{sheet_name}'...")
-
         spreadsheet = client.open(sheet_name)
         worksheet = spreadsheet.worksheet(worksheet_name)
         data = worksheet.get_all_records()
@@ -101,7 +97,7 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
         required_cols = ['TANGGAL', 'SHIFT', 'PSM Target', 'PSM Actual', 'PWP Target', 'PWP Actual', 'SG Target', 'SG Actual', 'APC Target', 'APC Actual']
         if not all(col in df.columns for col in required_cols):
             missing_cols = [col for col in required_cols if col not in df.columns]
-            st.error(f"❌ **Error Validasi Kolom:** Kolom berikut tidak ditemukan: {', '.join(missing_cols)}. Periksa ejaan header di Google Sheet Anda.")
+            st.error(f"❌ **Error Validasi Kolom:** Kolom berikut tidak ditemukan: {', '.join(missing_cols)}.")
             return pd.DataFrame()
 
         # --- Preprocessing Data ---
@@ -117,40 +113,8 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
                 df[col] = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # --- Perhitungan Skor PPSA Berdasarkan Bobot ---
-        # Definisi Bobot
-        bobot_psm = 0.20
-        bobot_pwp = 0.25
-        bobot_sg = 0.30
-        bobot_apc = 0.25
-
-        # Fungsi helper untuk menghitung achievement (ACV)
-        def hitung_acv(actual, target):
-            if target == 0:
-                return 0
-            acv = (actual / target) * 100
-            # PERBAIKAN: Menggunakan min() sebagai pengganti .clip()
-            return min(acv, 100)
-
-        # Hitung ACV untuk setiap metrik
-        df['PSM ACV'] = df.apply(lambda row: hitung_acv(row['PSM Actual'], row['PSM Target']), axis=1)
-        df['PWP ACV'] = df.apply(lambda row: hitung_acv(row['PWP Actual'], row['PWP Target']), axis=1)
-        df['SG ACV'] = df.apply(lambda row: hitung_acv(row['SG Actual'], row['SG Target']), axis=1)
-        df['APC ACV'] = df.apply(lambda row: hitung_acv(row['APC Actual'], row['APC Target']), axis=1)
-
-        # Hitung skor per komponen
-        df['SCORE PSM'] = df['PSM ACV'] * bobot_psm
-        df['SCORE PWP'] = df['PWP ACV'] * bobot_pwp
-        df['SCORE SG'] = df['SG ACV'] * bobot_sg
-        df['SCORE APC'] = df['APC ACV'] * bobot_apc
-
-        # Hitung Total Skor PPSA
-        df['TOTAL SCORE PPSA'] = df['SCORE PSM'] + df['SCORE PWP'] + df['SCORE SG'] + df['SCORE APC']
-
         if debug_mode:
-            st.success("   ✅ Data berhasil diproses dan skor PPSA dihitung.")
-            st.write("   - 5 baris pertama data setelah perhitungan:")
-            st.dataframe(df.head())
+            st.success("   ✅ Data mentah berhasil dimuat dan dibersihkan.")
         
         return df
 
@@ -158,21 +122,65 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
         st.error(f"❌ **Error Tak Terduga:** {e}")
         return pd.DataFrame()
 
+# --- FUNGSI BARU: Perhitungan Skor Berdasarkan Agregasi ---
+def calculate_aggregated_scores(df, group_by_col='SHIFT'):
+    """
+    Menghitung skor PPSA berdasarkan agregasi data terlebih dahulu.
+    """
+    # --- Langkah 1: Agregasi Data ---
+    agg_rules = {
+        'PSM Target': 'sum',
+        'PSM Actual': 'sum',
+        'PWP Target': 'sum',
+        'PWP Actual': 'sum',
+        'SG Target': 'sum',
+        'SG Actual': 'sum',
+        'APC Target': 'mean', # Rata-rata untuk APC
+        'APC Actual': 'mean', # Rata-rata untuk APC
+        'TARGET TEBUS 2500': 'sum',
+        'ACTUAL TEBUS 2500': 'sum'
+    }
+    aggregated_df = df.groupby(group_by_col).agg(agg_rules).reset_index()
+
+    # --- Langkah 2: Hitung ACV dan Skor Akhir ---
+    # Definisi Bobot
+    bobot = {'PSM': 0.20, 'PWP': 0.25, 'SG': 0.30, 'APC': 0.25}
+
+    for metric in ['PSM', 'PWP', 'SG', 'APC']:
+        target_col = f'{metric} Target'
+        actual_col = f'{metric} Actual'
+        acv_col = f'{metric} ACV'
+        score_col = f'SCORE {metric}'
+
+        # Hitung ACV, hindari pembagian dengan nol
+        aggregated_df[acv_col] = aggregated_df.apply(
+            lambda row: (row[actual_col] / row[target_col] * 100) if row[target_col] > 0 else 0, axis=1
+        )
+        # Batasi ACV maksimal 100
+        aggregated_df[acv_col] = aggregated_df[acv_col].apply(lambda x: min(x, 100))
+        # Hitung skor berdasarkan bobot
+        aggregated_df[score_col] = aggregated_df[acv_col] * bobot[metric]
+
+    # --- Langkah 3: Hitung Total Skor PPSA ---
+    score_cols = [f'SCORE {m}' for m in bobot.keys()]
+    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+
+    return aggregated_df
+
+
 # --- Fungsi untuk Mendapatkan Insight dari Gemini AI ---
 def get_gemini_insight(data_summary, debug_mode=False):
     """Menghasilkan insight dari Gemini AI."""
     if debug_mode:
-        st.write("4. Meminta insight ke Gemini AI...")
+        st.write("Meminta insight ke Gemini AI...")
     try:
         genai.configure(api_key=st.secrets["gemini_api"]["api_key"])
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"Anda adalah analis data bisnis. Berdasarkan ringkasan berikut, berikan insight singkat (maks 3 kalimat) dalam bahasa Indonesia. Fokus pada pencapaian target. Ringkasan: {data_summary}"
         response = model.generate_content(prompt)
-        if debug_mode:
-            st.success("   ✅ Berhasil mendapat insight dari AI.")
         return response.text
     except Exception as e:
-        st.error(f"❌ **Error AI:** Tidak dapat mengambil insight. Periksa API Key Gemini. Detail: {e}")
+        st.error(f"❌ **Error AI:** Tidak dapat mengambil insight. Detail: {e}")
         return f"Tidak dapat mengambil insight dari AI."
 
 # --- Sidebar untuk Filter ---
@@ -182,40 +190,46 @@ debug_mode = st.sidebar.checkbox("🔍 Aktifkan Debug Mode", help="Tampilkan log
 SHEET_NAME = "PesanOtomatis" 
 WORKSHEET_NAME = "Data"
 
-df = load_data(SHEET_NAME, WORKSHEET_NAME, debug_mode)
+# --- Load Data Mentah ---
+raw_df = load_data(SHEET_NAME, WORKSHEET_NAME, debug_mode)
 
-if not df.empty:
-    # Filter Tanggal
-    min_date = df['TANGGAL'].min()
-    max_date = df['TANGGAL'].max()
+if not raw_df.empty:
+    # --- Filter Data Mentah ---
+    min_date = raw_df['TANGGAL'].min()
+    max_date = raw_df['TANGGAL'].max()
     selected_dates = st.sidebar.date_input("Pilih Rentang Tanggal", [min_date, max_date], min_value=min_date, max_value=max_date)
-
-    # Filter Shift
-    all_shifts = ['Semua'] + sorted(df['SHIFT'].unique().tolist())
+    all_shifts = ['Semua'] + sorted(raw_df['SHIFT'].unique().tolist())
     selected_shift = st.sidebar.selectbox("Pilih Shift", all_shifts)
 
-    # Terapkan Filter
     if len(selected_dates) == 2:
         start_date, end_date = selected_dates
-        filtered_df = df[(df['TANGGAL'] >= start_date) & (df['TANGGAL'] <= end_date)]
+        filtered_df = raw_df[(raw_df['TANGGAL'] >= start_date) & (raw_df['TANGGAL'] <= end_date)]
     else:
-        filtered_df = df[df['TANGGAL'] == selected_dates[0]]
+        filtered_df = raw_df[raw_df['TANGGAL'] == selected_dates[0]]
 
     if selected_shift != 'Semua':
         filtered_df = filtered_df[filtered_df['SHIFT'] == selected_shift]
+    
+    # --- Hitung Skor Berdasarkan Data yang Sudah Difilter ---
+    # Jika "Semua" shift dipilih, kita hitung per shift. Jika satu shift dipilih, kita hitung total untuk shift tersebut.
+    if selected_shift == 'Semua':
+        scores_df = calculate_aggregated_scores(filtered_df, group_by_col='SHIFT')
+    else:
+        # Jika hanya satu shift, kita perlakukan seluruh data sebagai satu grup untuk mendapatkan total skor
+        scores_df = calculate_aggregated_scores(filtered_df, group_by_col='SHIFT')
+
 
     # --- Header Dashboard ---
     st.title("PPSA 2GC6 BAROS PANDEGLANG")
     st.markdown("---")
 
-    # --- Bagian 1: Metrik Utama ---
-    st.subheader("📈 Metrik Utama")
+    # --- Bagian 1: Metrik Utama (dari total data yang difilter) ---
+    st.subheader("📈 Metrik Utama (Total)")
     total_psm_actual = filtered_df['PSM Actual'].sum()
     total_pwp_actual = filtered_df['PWP Actual'].sum()
     total_sg_actual = filtered_df['SG Actual'].sum()
     avg_apc_actual = filtered_df['APC Actual'].mean()
 
-    # Fungsi helper untuk memformat angka
     def format_number(num):
         return f"{num:,.0f}".replace(",", ".")
 
@@ -231,51 +245,36 @@ if not df.empty:
 
     st.markdown("---")
     
-    # --- Bagian 2: Grafik ---
+    # --- Bagian 2: Tabel Skor PPSA (Ini adalah bagian terpenting) ---
+    st.subheader("📊 Tabel Skor PPSA per Shift")
+    # Pilih kolom yang ingin ditampilkan
+    display_cols = [
+        'SHIFT', 'PSM ACV', 'SCORE PSM', 'PWP ACV', 'SCORE PWP', 
+        'SG ACV', 'SCORE SG', 'APC ACV', 'SCORE APC', 'TOTAL SCORE PPSA'
+    ]
+    st.dataframe(scores_df[display_cols], use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+
+    # --- Bagian 3: Grafik ---
     st.subheader("📉 Visualisasi Data")
     col_g1, col_g2 = st.columns(2)
     with col_g1:
-        st.markdown("**Tren Total Score PPSA per Hari**")
-        trend_data = filtered_df.groupby('TANGGAL')['TOTAL SCORE PPSA'].sum().reset_index()
-        fig_line = px.line(trend_data, x='TANGGAL', y='TOTAL SCORE PPSA', markers=True, template='plotly_dark')
-        st.plotly_chart(fig_line, use_container_width=True)
+        st.markdown("**Perbandingan Total Skor per Shift**")
+        fig_bar = px.bar(scores_df, x='SHIFT', y='TOTAL SCORE PPSA', template='plotly_dark', title='Total Skor PPSA')
+        st.plotly_chart(fig_bar, use_container_width=True)
     with col_g2:
-        st.markdown("**Distribusi Skor per Shift**")
-        pie_data = filtered_df.groupby('SHIFT')['TOTAL SCORE PPSA'].sum().reset_index()
-        fig_pie = px.pie(pie_data, values='TOTAL SCORE PPSA', names='SHIFT', hole=0.4, template='plotly_dark')
+        st.markdown("**Kontribusi Skor per Shift**")
+        fig_pie = px.pie(scores_df, values='TOTAL SCORE PPSA', names='SHIFT', hole=0.4, template='plotly_dark', title='Total Skor PPSA')
         st.plotly_chart(fig_pie, use_container_width=True)
     
     st.markdown("---")
     
-    # --- Bagian 3: Tabel Detail ---
-    st.subheader("📋 Tabel Detail")
-    col_t1, col_t2 = st.columns(2)
-    with col_t1:
-        st.markdown("**PPSA per Shift**")
-        table_shift = filtered_df.groupby('SHIFT').agg(
-            PSM_Actual=('PSM Actual', 'sum'),
-            PWP_Actual=('PWP Actual', 'sum'),
-            SG_Actual=('SG Actual', 'sum'),
-            APC_Actual=('APC Actual', 'mean'),
-            Total_Score_PPSA=('TOTAL SCORE PPSA', 'sum')
-        ).reset_index()
-        st.dataframe(table_shift, use_container_width=True, hide_index=True)
-    with col_t2:
-        st.markdown("**PPSA & Tebus 2500**")
-        table_tebus = filtered_df.groupby('SHIFT')[['TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'TOTAL SCORE PPSA']].sum().reset_index()
-        st.dataframe(table_tebus, use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    # --- Tambahkan Tabel Detail Skor ---
-    with st.expander("🔢 Lihat Detail Perhitungan Skor"):
-        st.markdown("**Tabel Detail Skor per Komponen**")
-        detail_cols = ['SHIFT', 'PSM ACV', 'SCORE PSM', 'PWP ACV', 'SCORE PWP', 'SG ACV', 'SCORE SG', 'APC ACV', 'SCORE APC', 'TOTAL SCORE PPSA']
-        st.dataframe(filtered_df[detail_cols], use_container_width=True, hide_index=True)
-
     # --- Bagian 4: Insight dari AI ---
     st.subheader("🤖 Insight dari Gemini AI")
-    summary = f"Periode: {start_date} hingga {end_date}, Shift: {selected_shift}. PSM Total: {total_psm_actual}, PWP Total: {total_pwp_actual}, SG Total: {total_sg_actual}, APC Rata-rata: {avg_apc_actual}."
+    # Gunakan total skor dari keseluruhan data yang difilter untuk insight
+    total_score_for_insight = scores_df['TOTAL SCORE PPSA'].sum()
+    summary = f"Periode: {start_date} hingga {end_date}. Total PSM: {total_psm_actual}, Total PWP: {total_pwp_actual}, Total SG: {total_sg_actual}, Rata-rata APC: {avg_apc_actual}. Total Skor PPSA keseluruhan adalah {total_score_for_insight:.2f}."
     with st.spinner("Sedang menganalisis data..."):
         insight = get_gemini_insight(summary, debug_mode)
     st.info(insight)
