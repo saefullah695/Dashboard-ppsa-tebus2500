@@ -415,11 +415,56 @@ def format_currency(value: float) -> str:
         return "Rp 0"
 
 def format_percentage(value: float) -> str:
-    """Format nilai ke persentase"""
+    """Format nilai ke persentase dengan 2 desimal"""
     try:
-        return f"{value:.1f}%"
+        return f"{value:.2f}%"
     except (TypeError, ValueError):
-        return "0.0%"
+        return "0.00%"
+
+def format_score(value: float) -> str:
+    """Format nilai score dengan 2 desimal"""
+    try:
+        return f"{value:.2f}"
+    except (TypeError, ValueError):
+        return "0.00"
+
+def format_number(value: float) -> str:
+    """Format nilai tanpa desimal"""
+    try:
+        return f"{value:,.0f}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "0"
+
+def convert_percentage_to_decimal(value) -> float:
+    """
+    Konversi berbagai format persentase ke desimal (0-1)
+    Menangani format: '85%', '85.5%', '0.85', 0.85, 85, '85,5%'
+    """
+    if pd.isna(value):
+        return 0.0
+    
+    # Konversi ke string dulu untuk handling yang konsisten
+    value_str = str(value)
+    
+    # Hapus karakter non-numerik kecuali titik dan koma
+    value_str = re.sub(r'[^\d.,-]', '', value_str)
+    
+    # Ganti koma dengan titik untuk desimal
+    value_str = value_str.replace(',', '.')
+    
+    # Konversi ke numeric
+    try:
+        numeric_value = float(value_str)
+    except (ValueError, TypeError):
+        return 0.0
+    
+    # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kembalikan sebagai desimal
+    # Kondisi: nilai > 0 dan nilai < 1
+    if 0 < numeric_value < 1:
+        return numeric_value
+    
+    # Jika nilai adalah persentase (85, 85.5), konversi ke desimal
+    return numeric_value / 100
 
 def create_metric_card(title: str, value: str, delta: str = None, 
                       delta_type: str = "neutral", icon: str = "📊") -> str:
@@ -504,17 +549,12 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             # Konversi ke numeric
             numeric_series = pd.to_numeric(series, errors='coerce')
             
-            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100.
-            # Kondisi: nilai > 0 dan nilai < 1.
-            # Ini adalah standar untuk menangani data yang tidak konsisten.
-            # Nilai seperti 1.3 (dari 1,3) akan tetap 1.3, bukan 130, untuk menghindari kesalahan pada data yang sudah benar (misal 60).
+            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100
+            # Kondisi: nilai > 0 dan nilai < 1
             numeric_series = numeric_series.apply(lambda x: x * 100 if 0 < x < 1 else x)
             
-            # --- PERBAIKAN: HAPUS BATASAN 100% ---
-            # Kami menghapus pembatasan nilai maksimal 100%.
-            # Ini memungkinkan Anda melihat data yang salah input (misal 130%) dan memperbaikinya di sumber.
-            # Jika Anda ingin membatasi nilai, Anda bisa mengaktifkan kembali baris di bawah ini:
-            # numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
+            # --- PERBAIKAN: Batasi nilai maksimal menjadi 100% ---
+            numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
             
             return numeric_series
         
@@ -529,10 +569,8 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
                 df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # --- PERBAIKAN UTAMA: PERHITUNGAN TOTAL SCORE PPSA ---
-        # Perbaiki perhitungan total score PPSA dengan rumus RATA-RATA BERBOBOT yang benar.
+        # Perbaiki perhitungan total score PPSA jika belum benar
         if all(col in df.columns for col in ['SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']):
-            # Jika kolom SCORE sudah ada, gunakan nilai tersebut
             df['TOTAL SCORE PPSA (CORRECTED)'] = (
                 df['SCORE PSM'].fillna(0) + 
                 df['SCORE PWP'].fillna(0) + 
@@ -540,26 +578,12 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
                 df['SCORE APC'].fillna(0)
             )
         elif all(col in df.columns for col in ['PSM ACV', 'BOBOT PSM', 'PWP ACV', 'BOBOT PWP', 'SG ACV', 'BOBOT SG', 'APC ACV', 'BOBOT APC']):
-            # Jika tidak ada kolom SCORE, hitung dari ACV dan BOBOT dengan rumus RATA-RATA BERBOBOT
-            indicators = ['PSM', 'PWP', 'SG', 'APC']
-            acv_cols = [f'{ind} ACV' for ind in indicators]
-            weight_cols = [f'{ind} BOBOT' for ind in indicators]
-            
-            # Pastikan semua kolom yang dibutuhkan ada
-            if all(col in df.columns for col in acv_cols + weight_cols):
-                # Hitung jumlah bobot per baris untuk menghindari kesalahan jika ada bobot yang kosong
-                total_bobot = df[weight_cols].fillna(0).sum(axis=1)
-                
-                # Hitung jumlah dari (ACV * BOBOT) per baris
-                weighted_sum = (df[acv_cols].fillna(0) * df[weight_cols].fillna(0)).sum(axis=1)
-                
-                # Hindari pembagian dengan nol. Jika total bobot 0, score menjadi 0.
-                df['TOTAL SCORE PPSA (CORRECTED)'] = weighted_sum / total_bobot.replace(0, np.nan)
-                
-                # Isi nilai NaN (hasil dari pembagian 0/0) dengan 0
-                df['TOTAL SCORE PPSA (CORRECTED)'] = df['TOTAL SCORE PPSA (CORRECTED)'].fillna(0)
-            else:
-                df['TOTAL SCORE PPSA (CORRECTED)'] = 0 # Default jika kolom tidak lengkap
+            df['TOTAL SCORE PPSA (CORRECTED)'] = (
+                (df['PSM ACV'].fillna(0) * df['BOBOT PSM'].fillna(0)) + 
+                (df['PWP ACV'].fillna(0) * df['BOBOT PWP'].fillna(0)) + 
+                (df['SG ACV'].fillna(0) * df['BOBOT SG'].fillna(0)) + 
+                (df['APC ACV'].fillna(0) * df['BOBOT APC'].fillna(0))
+            )
         else:
             df['TOTAL SCORE PPSA (CORRECTED)'] = df['TOTAL SCORE PPSA'].fillna(0)
         
@@ -602,6 +626,58 @@ def filter_data(df: pd.DataFrame, filters: Dict) -> pd.DataFrame:
             filtered_df = filtered_df[filtered_df['SHIFT'].isin(filters['shifts'])]
     
     return filtered_df
+
+def calculate_global_ppsa_score(df: pd.DataFrame) -> Dict:
+    """
+    Menghitung Global PPSA Score dari semua kasir
+    Rumus: Score per Indikator = (ACV / 100) × Bobot
+    Total Global Score = Σ(Score PSM + PWP + SG + APC)
+    """
+    if df.empty:
+        return {
+            'global_score': 0.0,
+            'details': {
+                'PSM': {'acv': 0.0, 'bobot': 0.0, 'kontribusi': 0.0},
+                'PWP': {'acv': 0.0, 'bobot': 0.0, 'kontribusi': 0.0},
+                'SG': {'acv': 0.0, 'bobot': 0.0, 'kontribusi': 0.0},
+                'APC': {'acv': 0.0, 'bobot': 0.0, 'kontribusi': 0.0}
+            }
+        }
+    
+    # Hitung rata-rata ACV dan bobot untuk setiap indikator
+    indicators = ['PSM', 'PWP', 'SG', 'APC']
+    details = {}
+    total_score = 0.0
+    
+    for indicator in indicators:
+        acv_col = f'{indicator} ACV'
+        bobot_col = f'BOBOT {indicator}'
+        
+        if acv_col in df.columns and bobot_col in df.columns:
+            avg_acv = df[acv_col].mean()
+            avg_bobot = df[bobot_col].mean()
+            
+            # Kontribusi = (Avg ACV / 100) × Avg Bobot
+            kontribusi = (avg_acv / 100) * avg_bobot
+            
+            details[indicator] = {
+                'acv': avg_acv,
+                'bobot': avg_bobot,
+                'kontribusi': kontribusi
+            }
+            
+            total_score += kontribusi
+        else:
+            details[indicator] = {
+                'acv': 0.0,
+                'bobot': 0.0,
+                'kontribusi': 0.0
+            }
+    
+    return {
+        'global_score': total_score,
+        'details': details
+    }
 
 # =========================================================
 # ------------------- VISUALISASI CHARTS -----------------
@@ -648,7 +724,7 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         line_color=COLOR_SCHEME['primary'],
         fillcolor=f"rgba(99, 102, 241, 0.3)",
         hovertemplate="<b>%{theta}</b><br>" +
-                     "ACV: %{r:.1f}%<br>" +
+                     "ACV: %{r:.2f}%<br>" +
                      "<extra></extra>"
     ))
     
@@ -670,7 +746,7 @@ def create_ppsa_radar_chart(df: pd.DataFrame) -> go.Figure:
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, max(120, max(avg_values) * 1.1)],
+                range=[0, 100],
                 ticksuffix="%"
             )
         ),
@@ -701,9 +777,9 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
     # Tentukan warna berdasarkan performa
     colors = []
     for score in cashier_performance['Rata_rata_Score']:
-        if score >= 80: # Perbaikan: Menyesuaikan dengan target 100
+        if score >= 80:
             colors.append(COLOR_SCHEME['success'])
-        elif score >= 60: # Perbaikan: Menyesuaikan dengan target 100
+        elif score >= 60:
             colors.append(COLOR_SCHEME['warning'])
         else:
             colors.append(COLOR_SCHEME['danger'])
@@ -713,10 +789,10 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
         y=cashier_performance['NAMA KASIR'],
         orientation='h',
         marker_color=colors,
-        text=[f"{score:.1f}" for score in cashier_performance['Rata_rata_Score']],
+        text=[f"{score:.2f}" for score in cashier_performance['Rata_rata_Score']],
         textposition='auto',
         hovertemplate="<b>%{y}</b><br>" +
-                     "Score: %{x:.1f}<br>" +
+                     "Score: %{x:.2f}<br>" +
                      "Jumlah Laporan: %{customdata}<br>" +
                      "<extra></extra>",
         customdata=cashier_performance['Jumlah_Laporan']
@@ -730,7 +806,7 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
         showlegend=False
     )
     
-    # --- PERBAIKAN: Garis referensi disesuaikan dengan target 100 ---
+    # Garis referensi
     fig.add_vline(x=100, line_dash="dash", line_color=COLOR_SCHEME['success'], 
                   annotation_text="Target Excellent (100)")
     fig.add_vline(x=80, line_dash="dash", line_color=COLOR_SCHEME['warning'], 
@@ -814,7 +890,7 @@ def create_tebus_murah_chart(df: pd.DataFrame) -> go.Figure:
                 line=dict(color=COLOR_SCHEME['accent'], width=3),
                 marker=dict(size=8),
                 hovertemplate="<b>%{x}</b><br>" +
-                             "ACV: %{y:.1f}%<br>" +
+                             "ACV: %{y:.2f}%<br>" +
                              "<extra></extra>"
             ),
             secondary_y=True
@@ -866,7 +942,7 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         fill='tonexty',
         fillcolor=f"rgba(99, 102, 241, 0.1)",
         hovertemplate="<b>%{x}</b><br>" +
-                     "Score: %{y:.1f}<br>" +
+                     "Score: %{y:.2f}<br>" +
                      "<extra></extra>"
     ))
     
@@ -878,7 +954,7 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         name='MA 3 Hari',
         line=dict(color=COLOR_SCHEME['secondary'], width=2, dash='dot'),
         hovertemplate="<b>%{x}</b><br>" +
-                     "MA 3 Hari: %{y:.1f}<br>" +
+                     "MA 3 Hari: %{y:.2f}<br>" +
                      "<extra></extra>"
     ))
     
@@ -889,7 +965,7 @@ def create_trend_analysis_chart(df: pd.DataFrame) -> go.Figure:
         name='MA 7 Hari',
         line=dict(color=COLOR_SCHEME['success'], width=3, dash='dash'),
         hovertemplate="<b>%{x}</b><br>" +
-                     "MA 7 Hari: %{y:.1f}<br>" +
+                     "MA 7 Hari: %{y:.2f}<br>" +
                      "<extra></extra>"
     ))
     
@@ -943,10 +1019,10 @@ def create_acv_comparison_chart(df: pd.DataFrame) -> go.Figure:
             x=acv_columns,
             y=acv_averages,
             marker_color=colors,
-            text=[f"{val:.1f}%" for val in acv_averages],
+            text=[f"{val:.2f}%" for val in acv_averages],
             textposition='auto',
             hovertemplate="<b>%{x}</b><br>" +
-                         "Rata-rata ACV: %{y:.1f}%<br>" +
+                         "Rata-rata ACV: %{y:.2f}%<br>" +
                          "<extra></extra>"
         )
     ])
@@ -1041,11 +1117,11 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     - Standar Deviasi: {ppsa_summary.get('std_score', 0):.2f}
 
     📈 ANALISIS PER INDIKATOR (SEMUA DALAM %):
-    """ + "\n".join([f"- {indicator}: ACV {data['avg_acv']:.1f}%, Score {data['avg_score']:.2f}" if data['avg_score'] else f"- {indicator}: ACV {data['avg_acv']:.1f}%"
+    """ + "\n".join([f"- {indicator}: ACV {data['avg_acv']:.2f}%, Score {data['avg_score']:.2f}" if data['avg_score'] else f"- {indicator}: ACV {data['avg_acv']:.2f}%"
                      for indicator, data in indicators_analysis.items()]) + f"""
     
     💰 TEBUS MURAH:
-    - ACV Tebus Murah: {tebus_murah_acv:.1f}%
+    - ACV Tebus Murah: {tebus_murah_acv:.2f}%
 
     🏆 PERFORMA KASIR:
     - Terbaik: {best_performer} ({best_score:.2f} poin)
@@ -1165,7 +1241,6 @@ def render_sidebar(df: pd.DataFrame) -> Dict:
         
         # Data info
         if not df.empty:
-            # --- PERBAIKAN ERROR F-STRING ---
             # Hitung nilai-nilai terlebih dahulu sebelum memasukkannya ke f-string
             total_records_count = f"{len(df):,}"
             kasir_aktif_count = f"{df['NAMA KASIR'].nunique()}" if 'NAMA KASIR' in df.columns else 'N/A'
@@ -1225,6 +1300,9 @@ def main():
         st.warning("⚠️ Filter yang dipilih tidak menghasilkan data")
         return
     
+    # Calculate Global PPSA Score
+    global_ppsa = calculate_global_ppsa_score(filtered_df)
+    
     # Key Metrics Section
     st.markdown("## 📊 Key Performance Indicators")
     
@@ -1252,44 +1330,78 @@ def main():
     # Render metrics grid
     st.markdown('<div class="metrics-grid">', unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.markdown(create_metric_card(
             "Total Hari Kerja (JHK)",
-            f"{total_hari_kerja:,.0f}",
+            format_number(total_hari_kerja),
             icon="📅"
         ), unsafe_allow_html=True)
     
     with col2:
-        # --- PERBAIKAN: Target dan logika warna disesuaikan dengan 100 ---
+        # Global PPSA Score
+        delta_type = "positive" if global_ppsa['global_score'] >= 80 else "warning" if global_ppsa['global_score'] >= 60 else "negative"
+        st.markdown(create_metric_card(
+            "Global PPSA Score",
+            format_score(global_ppsa['global_score']),
+            delta=f"Target: 100.00",
+            delta_type=delta_type,
+            icon="🌍"
+        ), unsafe_allow_html=True)
+    
+    with col3:
         delta_type = "positive" if avg_ppsa_score >= 80 else "warning" if avg_ppsa_score >= 60 else "negative"
         st.markdown(create_metric_card(
             "Rata-rata Score PPSA",
-            f"{avg_ppsa_score:.1f}",
-            delta=f"Target: 100.0",
+            format_score(avg_ppsa_score),
+            delta=f"Target: 100.00",
             delta_type=delta_type,
             icon="🎯"
         ), unsafe_allow_html=True)
     
-    with col3:
+    with col4:
         st.markdown(create_metric_card(
             "Total Tebus Murah",
-            f"{total_tebus_actual:,.0f}",
+            format_number(total_tebus_actual),
             icon="💰"
         ), unsafe_allow_html=True)
     
-    with col4:
+    with col5:
         delta_type = "positive" if avg_tebus_acv >= 80 else "warning" if avg_tebus_acv >= 60 else "negative"
         st.markdown(create_metric_card(
             "ACV Tebus Murah",
-            f"{avg_tebus_acv:.1f}%",
-            delta="Target: 100%",
+            format_percentage(avg_tebus_acv),
+            delta="Target: 100.00%",
             delta_type=delta_type,
             icon="📈"
         ), unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Global PPSA Score Details
+    with st.expander("🌍 Detail Global PPSA Score", expanded=False):
+        st.markdown("### Kontribusi Setiap Indikator terhadap Global Score")
+        
+        details_data = []
+        for indicator, data in global_ppsa['details'].items():
+            details_data.append({
+                'Indikator': indicator,
+                'ACV': format_percentage(data['acv']),
+                'Bobot': format_score(data['bobot']),
+                'Kontribusi': format_score(data['kontribusi'])
+            })
+        
+        details_df = pd.DataFrame(details_data)
+        st.dataframe(details_df, use_container_width=True)
+        
+        st.markdown(f"""
+        **Total Global PPSA Score:** {format_score(global_ppsa['global_score'])}
+        
+        **Cara Perhitungan:**
+        - Score per Indikator = (ACV / 100) × Bobot
+        - Total Global Score = Σ(Score PSM + PWP + SG + APC)
+        """)
     
     # Main Content Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -1337,7 +1449,7 @@ def main():
                     marker_color=COLOR_SCHEME['primary'],
                     opacity=0.7,
                     hovertemplate="<b>Score PPSA</b><br>" +
-                                 "Range: %{x:.1f} - %{y:.1f}<br>" +
+                                 "Range: %{x:.2f}<br>" +
                                  "Frekuensi: %{y}<br>" +
                                  "<extra></extra>"
                 )])
@@ -1372,7 +1484,12 @@ def main():
             score_detail['TOTAL SCORE'] = score_detail[score_cols].sum(axis=1)
             score_detail = score_detail.sort_values('TOTAL SCORE', ascending=False)
             
-            st.dataframe(score_detail, use_container_width=True)
+            # Format the dataframe with 2 decimal places
+            formatted_score_detail = score_detail.copy()
+            for col in score_cols + ['TOTAL SCORE']:
+                formatted_score_detail[col] = formatted_score_detail[col].apply(lambda x: format_score(x))
+            
+            st.dataframe(formatted_score_detail, use_container_width=True)
         
         # ACV Comparison Chart
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
@@ -1397,6 +1514,13 @@ def main():
             
             tebus_detail['ACV (%)'] = (tebus_detail['ACTUAL TEBUS 2500'] / tebus_detail['TARGET TEBUS 2500'] * 100).round(2)
             tebus_detail['Gap'] = tebus_detail['TARGET TEBUS 2500'] - tebus_detail['ACTUAL TEBUS 2500']
+            
+            # Format the dataframe
+            formatted_tebus_detail = tebus_detail.copy()
+            formatted_tebus_detail['TARGET TEBUS 2500'] = formatted_tebus_detail['TARGET TEBUS 2500'].apply(lambda x: format_number(x))
+            formatted_tebus_detail['ACTUAL TEBUS 2500'] = formatted_tebus_detail['ACTUAL TEBUS 2500'].apply(lambda x: format_number(x))
+            formatted_tebus_detail['ACV (%)'] = formatted_tebus_detail['ACV (%)'].apply(lambda x: format_percentage(x))
+            formatted_tebus_detail['Gap'] = formatted_tebus_detail['Gap'].apply(lambda x: format_number(x))
             
             # Color coding for performance
             def color_performance(val):
@@ -1440,7 +1564,8 @@ def main():
                     aspect='auto',
                     labels=dict(color="Korelasi"),
                     title="<b>🔗 Heatmap Korelasi Semua Indikator ACV (%)</b>",
-                    text_auto=True
+                    text_auto=True,
+                    color_continuous_midpoint=0
                 )
                 
                 st.markdown('<div class="chart-container">', unsafe_allow_html=True)
@@ -1516,20 +1641,9 @@ def main():
         })
         st.dataframe(col_info, use_container_width=True)
         
-        # --- PERBAIKAN KHUSUS UNTUK TAMPILAN RAW DATA ---
+        # Show actual data
         st.markdown("**📊 Data Sample:**")
-        # Buat salinan df hanya untuk keperluan display
-        display_df = filtered_df.copy()
-        # Identifikasi kolom ACV
-        acv_cols_to_format = [col for col in display_df.columns if 'ACV' in col]
-        
-        # Format kolom ACV menjadi string dengan simbol %
-        for col in acv_cols_to_format:
-            # Pastikan kolom ada dan bertipe numerik sebelum diformat
-            if pd.api.types.is_numeric_dtype(display_df[col]):
-                display_df[col] = display_df[col].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
-        
-        st.dataframe(display_df.head(100), use_container_width=True)
+        st.dataframe(filtered_df.head(100), use_container_width=True)
     
     # Footer
     st.markdown("---")
