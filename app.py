@@ -508,6 +508,9 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             # Kondisi: nilai > 0 dan nilai < 1
             numeric_series = numeric_series.apply(lambda x: x * 100 if 0 < x < 1 else x)
             
+            # --- PERBAIKAN: Batasi nilai maksimal menjadi 100% ---
+            numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
+            
             return numeric_series
         
         # Konversi kolom ACV dengan fungsi baru
@@ -677,9 +680,9 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
     # Tentukan warna berdasarkan performa
     colors = []
     for score in cashier_performance['Rata_rata_Score']:
-        if score >= 80:
+        if score >= 80: # Perbaikan: Menyesuaikan dengan target 100
             colors.append(COLOR_SCHEME['success'])
-        elif score >= 60:
+        elif score >= 60: # Perbaikan: Menyesuaikan dengan target 100
             colors.append(COLOR_SCHEME['warning'])
         else:
             colors.append(COLOR_SCHEME['danger'])
@@ -706,11 +709,11 @@ def create_cashier_performance_chart(df: pd.DataFrame) -> go.Figure:
         showlegend=False
     )
     
-    # Tambahkan garis referensi
-    fig.add_vline(x=80, line_dash="dash", line_color=COLOR_SCHEME['success'], 
-                  annotation_text="Target Excellent (80)")
-    fig.add_vline(x=60, line_dash="dash", line_color=COLOR_SCHEME['warning'], 
-                  annotation_text="Target Good (60)")
+    # --- PERBAIKAN: Garis referensi disesuaikan dengan target 100 ---
+    fig.add_vline(x=100, line_dash="dash", line_color=COLOR_SCHEME['success'], 
+                  annotation_text="Target Excellent (100)")
+    fig.add_vline(x=80, line_dash="dash", line_color=COLOR_SCHEME['warning'], 
+                  annotation_text="Target Good (80)")
     
     return fig
 
@@ -1043,7 +1046,7 @@ def generate_advanced_insights(df: pd.DataFrame, model) -> str:
     3. 🚀 REKOMENDASI STRATEGIS
     - Action plan konkret untuk meningkatkan performa
     - Prioritas improvement berdasarkan bobot indikator
-    - Target realistis untuk periode berikutnya
+    - Target realistis untuk periode berikutnya (dengan target sempurna 100)
 
     4. 💡 INSIGHTS BISNIS
     - Correlation antara performa kasir dengan faktor lain
@@ -1238,11 +1241,12 @@ def main():
         ), unsafe_allow_html=True)
     
     with col2:
-        delta_type = "positive" if avg_ppsa_score >= 70 else "warning" if avg_ppsa_score >= 50 else "negative"
+        # --- PERBAIKAN: Target dan logika warna disesuaikan dengan 100 ---
+        delta_type = "positive" if avg_ppsa_score >= 80 else "warning" if avg_ppsa_score >= 60 else "negative"
         st.markdown(create_metric_card(
             "Rata-rata Score PPSA",
             f"{avg_ppsa_score:.1f}",
-            delta=f"Target: 80.0",
+            delta=f"Target: 100.0",
             delta_type=delta_type,
             icon="🎯"
         ), unsafe_allow_html=True)
