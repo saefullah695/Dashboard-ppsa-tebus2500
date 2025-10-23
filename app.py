@@ -160,7 +160,6 @@ def get_gemini_insight(data_summary, debug_mode=False):
 
 # --- Sidebar untuk Filter ---
 st.sidebar.title("⚙️ Filter Data")
-# --- TAMBAHAN DEBUG MODE ---
 debug_mode = st.sidebar.checkbox("🔍 Aktifkan Debug Mode", help="Tampilkan log detail untuk mencari error")
 
 SHEET_NAME = "PesanOtomatis" 
@@ -192,25 +191,30 @@ if not df.empty:
     st.title("PPSA 2GC6 BAROS PANDEGLANG")
     st.markdown("---")
 
-    # --- Bagian 1: Metrik Utama ---
+    # --- Bagian 1: Metrik Utama (SUDAH DIPERBAIKI) ---
     st.subheader("📈 Metrik Utama")
     total_psm_actual = filtered_df['PSM Actual'].sum()
     total_pwp_actual = filtered_df['PWP Actual'].sum()
     total_sg_actual = filtered_df['SG Actual'].sum()
     total_apc_actual = filtered_df['APC Actual'].sum()
 
+    # Fungsi helper untuk memformat angka
+    def format_number(num):
+        return f"{num:,.0f}".replace(",", ".")
+
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown(f'<div class="metric-card metric-psm"><div class="metric-label">PSM</div><div class="metric-value">{total_psm_actual:,.0f}".replace(",", ".")</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card metric-psm"><div class="metric-label">PSM</div><div class="metric-value">{format_number(total_psm_actual)}</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-card metric-pwp"><div class="metric-label">PWP</div><div class="metric-value">{total_pwp_actual:,.0f}".replace(",", ".")</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card metric-pwp"><div class="metric-label">PWP</div><div class="metric-value">{format_number(total_pwp_actual)}</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(f'<div class="metric-card metric-sg"><div class="metric-label">SG</div><div class="metric-value">{total_sg_actual:,.0f}".replace(",", ".")</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card metric-sg"><div class="metric-label">SG</div><div class="metric-value">{format_number(total_sg_actual)}</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f'<div class="metric-card metric-apc"><div class="metric-label">APC</div><div class="metric-value">{total_apc_actual:,.0f}".replace(",", ".")</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card metric-apc"><div class="metric-label">APC</div><div class="metric-value">{format_number(total_apc_actual)}</div></div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    # ... (Sisanya kode untuk grafik, tabel, dan AI tetap sama)
+    
+    # --- Bagian 2: Grafik ---
     st.subheader("📉 Visualisasi Data")
     col_g1, col_g2 = st.columns(2)
     with col_g1:
@@ -225,6 +229,8 @@ if not df.empty:
         st.plotly_chart(fig_pie, use_container_width=True)
     
     st.markdown("---")
+    
+    # --- Bagian 3: Tabel Detail ---
     st.subheader("📋 Tabel Detail")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
@@ -237,6 +243,8 @@ if not df.empty:
         st.dataframe(table_tebus, use_container_width=True, hide_index=True)
 
     st.markdown("---")
+    
+    # --- Bagian 4: Insight dari AI ---
     st.subheader("🤖 Insight dari Gemini AI")
     summary = f"Periode: {start_date} hingga {end_date}, Shift: {selected_shift}, PSM: {total_psm_actual}, PWP: {total_pwp_actual}, SG: {total_sg_actual}, APC: {total_apc_actual}."
     with st.spinner("Sedang menganalisis data..."):
