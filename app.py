@@ -97,7 +97,7 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
             st.success(f"   ✅ Spreadsheet dan worksheet '{worksheet_name}' ditemukan.")
             st.write("3. Memproses data...")
 
-        # --- PERUBAHAN: Validasi Kolom Wajib (Termasuk Target) ---
+        # --- Validasi Kolom Wajib ---
         required_cols = ['TANGGAL', 'SHIFT', 'PSM Target', 'PSM Actual', 'PWP Target', 'PWP Actual', 'SG Target', 'SG Actual', 'APC Target', 'APC Actual']
         if not all(col in df.columns for col in required_cols):
             missing_cols = [col for col in required_cols if col not in df.columns]
@@ -117,7 +117,7 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
                 df[col] = df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # --- PERUBAHAN: Perhitungan Skor PPSA Berdasarkan Bobot ---
+        # --- Perhitungan Skor PPSA Berdasarkan Bobot ---
         # Definisi Bobot
         bobot_psm = 0.20
         bobot_pwp = 0.25
@@ -126,14 +126,17 @@ def load_data(sheet_name, worksheet_name, debug_mode=False):
 
         # Fungsi helper untuk menghitung achievement (ACV)
         def hitung_acv(actual, target):
+            if target == 0:
+                return 0
             acv = (actual / target) * 100
-            return acv.clip(upper=100) # Maksimal skor adalah 100
+            # PERBAIKAN: Menggunakan min() sebagai pengganti .clip()
+            return min(acv, 100)
 
         # Hitung ACV untuk setiap metrik
-        df['PSM ACV'] = df.apply(lambda row: hitung_acv(row['PSM Actual'], row['PSM Target']) if row['PSM Target'] > 0 else 0, axis=1)
-        df['PWP ACV'] = df.apply(lambda row: hitung_acv(row['PWP Actual'], row['PWP Target']) if row['PWP Target'] > 0 else 0, axis=1)
-        df['SG ACV'] = df.apply(lambda row: hitung_acv(row['SG Actual'], row['SG Target']) if row['SG Target'] > 0 else 0, axis=1)
-        df['APC ACV'] = df.apply(lambda row: hitung_acv(row['APC Actual'], row['APC Target']) if row['APC Target'] > 0 else 0, axis=1)
+        df['PSM ACV'] = df.apply(lambda row: hitung_acv(row['PSM Actual'], row['PSM Target']), axis=1)
+        df['PWP ACV'] = df.apply(lambda row: hitung_acv(row['PWP Actual'], row['PWP Target']), axis=1)
+        df['SG ACV'] = df.apply(lambda row: hitung_acv(row['SG Actual'], row['SG Target']), axis=1)
+        df['APC ACV'] = df.apply(lambda row: hitung_acv(row['APC Actual'], row['APC Target']), axis=1)
 
         # Hitung skor per komponen
         df['SCORE PSM'] = df['PSM ACV'] * bobot_psm
@@ -205,12 +208,11 @@ if not df.empty:
     st.title("PPSA 2GC6 BAROS PANDEGLANG")
     st.markdown("---")
 
-    # --- Bagian 1: Metrik Utama (SUDAH DIPERBAIKI) ---
+    # --- Bagian 1: Metrik Utama ---
     st.subheader("📈 Metrik Utama")
     total_psm_actual = filtered_df['PSM Actual'].sum()
     total_pwp_actual = filtered_df['PWP Actual'].sum()
     total_sg_actual = filtered_df['SG Actual'].sum()
-    # PERUBAHAN: APC dihitung rata-rata
     avg_apc_actual = filtered_df['APC Actual'].mean()
 
     # Fungsi helper untuk memformat angka
@@ -225,7 +227,6 @@ if not df.empty:
     with col3:
         st.markdown(f'<div class="metric-card metric-sg"><div class="metric-label">SG</div><div class="metric-value">{format_number(total_sg_actual)}</div></div>', unsafe_allow_html=True)
     with col4:
-        # PERUBAHAN: Label dan nilai untuk APC
         st.markdown(f'<div class="metric-card metric-apc"><div class="metric-label">APC (Rata-rata)</div><div class="metric-value">{format_number(avg_apc_actual)}</div></div>', unsafe_allow_html=True)
 
     st.markdown("---")
@@ -251,12 +252,11 @@ if not df.empty:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.markdown("**PPSA per Shift**")
-        # PERUBAHAN: Agregasi untuk APC adalah rata-rata
         table_shift = filtered_df.groupby('SHIFT').agg(
             PSM_Actual=('PSM Actual', 'sum'),
             PWP_Actual=('PWP Actual', 'sum'),
             SG_Actual=('SG Actual', 'sum'),
-            APC_Actual=('APC Actual', 'mean'), # Rata-rata
+            APC_Actual=('APC Actual', 'mean'),
             Total_Score_PPSA=('TOTAL SCORE PPSA', 'sum')
         ).reset_index()
         st.dataframe(table_shift, use_container_width=True, hide_index=True)
@@ -267,7 +267,7 @@ if not df.empty:
 
     st.markdown("---")
 
-    # --- PERUBAHAN: Tambahkan Tabel Detail Skor ---
+    # --- Tambahkan Tabel Detail Skor ---
     with st.expander("🔢 Lihat Detail Perhitungan Skor"):
         st.markdown("**Tabel Detail Skor per Komponen**")
         detail_cols = ['SHIFT', 'PSM ACV', 'SCORE PSM', 'PWP ACV', 'SCORE PWP', 'SG ACV', 'SCORE SG', 'APC ACV', 'SCORE APC', 'TOTAL SCORE PPSA']
@@ -275,7 +275,6 @@ if not df.empty:
 
     # --- Bagian 4: Insight dari AI ---
     st.subheader("🤖 Insight dari Gemini AI")
-    # PERUBAHAN: Ringkasan data mencakup APC rata-rata
     summary = f"Periode: {start_date} hingga {end_date}, Shift: {selected_shift}. PSM Total: {total_psm_actual}, PWP Total: {total_pwp_actual}, SG Total: {total_sg_actual}, APC Rata-rata: {avg_apc_actual}."
     with st.spinner("Sedang menganalisis data..."):
         insight = get_gemini_insight(summary, debug_mode)
