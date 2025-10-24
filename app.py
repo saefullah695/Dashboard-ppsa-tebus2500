@@ -9,7 +9,7 @@ from datetime import datetime
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
     page_title="Dashboard PPSA Analytics",
-    page_icon="📊", # Favicon browser, bisa diganti nanti
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -388,14 +388,13 @@ def calculate_overall_ppsa_breakdown(df):
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
         scores['apc'] = (acv_apc * weights['APC']) / 100
     
-    # --- TAMBAHAN: HITUNG ACV UNTUK TEBUS MURAH ---
     total_target_tebus = df['TARGET TEBUS 2500'].sum()
     total_actual_tebus = df['ACTUAL TEBUS 2500'].sum()
     if total_target_tebus > 0:
         acv_tebus = (total_actual_tebus / total_target_tebus) * 100
-        scores['tebus_murah'] = acv_tebus # Simpan sebagai ACV, bukan skor
+        scores['tebus_murah'] = acv_tebus
 
-    scores['total'] = sum(scores.values())
+    scores['total'] = sum([scores['psm'], scores['pwp'], scores['sg'], scores['apc']]) # Total PPSA tidak termasuk tebus
     return scores
 
 # --- FUNGSI BARU: MENGHITUNG SKOR AGREGAT PER KASIR ---
@@ -410,7 +409,6 @@ def calculate_aggregate_scores_per_cashier(df):
         'PWP Target': 'sum', 'PWP Actual': 'sum',
         'SG Target': 'sum', 'SG Actual': 'sum',
         'APC Target': 'mean', 'APC Actual': 'mean',
-        # --- TAMBAHAN: AGREGASI UNTUK TEBUS MURAH ---
         'TARGET TEBUS 2500': 'sum', 'ACTUAL TEBUS 2500': 'sum'
     }
     
@@ -431,7 +429,6 @@ def calculate_aggregate_scores_per_cashier(df):
     for comp in ['PSM', 'PWP', 'SG', 'APC']:
         aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
 
-    # --- TAMBAHAN: HITUNG ACV TEBUS MURAH PER KASIR ---
     def calculate_acv_tebus(row):
         if row['TARGET TEBUS 2500'] == 0: return 0.0
         return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
@@ -445,7 +442,6 @@ def calculate_aggregate_scores_per_cashier(df):
 
 
 # --- UI DASHBOARD ---
-# Header Dashboard dengan Icon Baru
 st.markdown(f"""
 <div class="dashboard-header">
     <h1 class="main-title">
@@ -455,12 +451,11 @@ st.markdown(f"""
     <p class="subtitle">
         Platform pemantauan performa komprehensif untuk indikator <strong>PPSA</strong> yang mencakup 
         <strong>PSM</strong> (Produk Spesial Mingguan), <strong>PWP</strong> (Purchase With Purchase), 
-        <strong>SG</strong> (Serba Gratis), <strong>APC</strong> (Average Purchase Customer), dan <strong>Tebus Murah</strong>.
+        <strong>SG</strong> (Serba Gratis), <strong>APC</strong> (Average Purchase Customer), dan <strong>Tebus (Suuegerr)</strong>.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
-# Load dan Process Data
 raw_df = load_data_from_gsheet()
 
 if not raw_df.empty:
@@ -507,13 +502,11 @@ if not raw_df.empty:
         st.markdown("**📊 Ringkasan Data**")
         st.info(f"**Total Record:** {len(filtered_df)}\n\n**Kasir Terpilih:** {len(selected_names) if 'selected_names' in locals() else 0}")
 
-    # --- RINGKASAN PERFORMA KESELURUHAN ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
     st.markdown('<h2 class="section-header">🏆 Ringkasan Performa Keseluruhan</h2>', unsafe_allow_html=True)
     
     overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    # --- PERBAIKAN: LAYOUT 5 KOLOM ---
     col1, col2, col3, col4, col5 = st.columns(5, gap="small")
     
     metrics = [
@@ -521,7 +514,8 @@ if not raw_df.empty:
         {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "pwp", "col": col2},
         {"label": "SG Score", "value": overall_scores['sg'], "icon": "sg", "col": col3},
         {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4},
-        {"label": "Tebus Murah ACV", "value": overall_scores['tebus_murah'], "icon": "tebus", "col": col5}
+        # --- PERBAIKAN 1: GANTI JUDUL METRIK ---
+        {"label": "Tebus (Suuegerr) ACV", "value": overall_scores['tebus_murah'], "icon": "tebus", "col": col5}
     ]
     
     for metric in metrics:
@@ -560,7 +554,6 @@ if not raw_df.empty:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- DATA PERFORMA KASIR ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
     st.markdown('<h2 class="section-header">📈 Total Performa Kasir (Agregat)</h2>', unsafe_allow_html=True)
     
@@ -596,10 +589,12 @@ if not raw_df.empty:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TAMBAHAN: SEKSI UNTUK TEBUS MURAH ---
+    # --- SEKSI UNTUK TEBUS (SUUEGERR) ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    st.markdown('<h2 class="section-header">🛒 Performa Tebus Murah (Rp 2.500)</h2>', unsafe_allow_html=True)
-    st.caption("Catatan: Indikator ini ditampilkan terpisah dan tidak termasuk dalam perhitungan Total PPSA.")
+    # --- PERBAIKAN 1: GANTI JUDUL SEKSI ---
+    st.markdown('<h2 class="section-header">🛒 Performa Tebus (Suuegerr)</h2>', unsafe_allow_html=True)
+    # --- PERBAIKAN 1: GANTI TEKS CAPTION ---
+    st.caption("Catatan: Indikator 'Tebus (Suuegerr)' ditampilkan terpisah dan tidak termasuk dalam perhitungan Total PPSA.")
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
         tebus_summary = calculate_aggregate_scores_per_cashier(filtered_df)
@@ -609,8 +604,28 @@ if not raw_df.empty:
         fig_tebus = go.Figure()
         colors = ['#10b981' if i < 3 else '#34d399' if i < 5 else '#a8a8a8' for i in range(len(tebus_summary))]
         fig_tebus.add_trace(go.Bar(y=tebus_summary['NAMA KASIR'], x=tebus_summary['(%) ACV TEBUS 2500'], orientation='h', marker=dict(color=colors, line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5)), text=[f"#{rank} - {score:.2f}%" for rank, score in zip(tebus_summary['Ranking'], tebus_summary['(%) ACV TEBUS 2500'])], textposition='outside', textfont=dict(size=11, color='#1e293b', weight='bold')))
-        fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), margin=dict(l=20, r=80, t=20, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='ACV Tebus Murah (%)'), yaxis=dict(showgrid=False, showline=False, categoryorder='total ascending', title=None))
+        # --- PERBAIKAN 1: GANTI JUDUL SUMBU X ---
+        fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), margin=dict(l=20, r=80, t=20, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='ACV Tebus (Suuegerr) (%)'), yaxis=dict(showgrid=False, showline=False, categoryorder='total ascending', title=None))
         st.plotly_chart(fig_tebus, use_container_width=True)
+
+        # --- PERBAIKAN 2: TAMBAHKAN TOP 3 PERFORMERS UNTUK TEBUS ---
+        st.markdown("#### 🛒 Top 3 Performers (Tebus Suuegerr)")
+        cols = st.columns(3)
+        medals = ["🥇", "🥈", "🥉"]
+        for idx, (col, medal) in enumerate(zip(cols, medals)):
+            if idx < len(tebus_summary):
+                with col:
+                    st.markdown(f"""
+                    <div class="metric-card" style="text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{medal}</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 0.25rem;">
+                            {tebus_summary.iloc[idx]['NAMA KASIR']}
+                        </div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">
+                            {tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
