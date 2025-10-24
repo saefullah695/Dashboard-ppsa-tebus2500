@@ -2,13 +2,84 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import plotly.express as px
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Dashboard PPSA (Produk Spesial, PWP, SG, APC)",
+    page_title="Dashboard PPSA",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# --- CSS KUSTOM UNTUK TAMPILAN MODERN ---
+st.markdown("""
+<style>
+/* Font dan Latar Belakang Utama */
+.stApp {
+    background-color: #F0F2F6;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* Judul Utama */
+.main-title {
+    font-size: 2.5rem;
+    color: #1f77b4;
+    font-weight: 700;
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #E0E0E0;
+    margin-bottom: 2rem;
+}
+
+/* Header */
+h2, h3 {
+    color: #1f77b4;
+    font-weight: 600;
+}
+
+/* Kartu Metrik */
+.metric-card {
+    background-color: #FFFFFF;
+    border-left: 5px solid #1f77b4;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+}
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Sidebar */
+.css-1d391kg, .css-1lcbmhc {
+    background-color: #FFFFFF;
+    border-right: 1px solid #E0E0E0;
+}
+
+/* Tabel Dataframe */
+.stDataFrame {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Container untuk konten utama */
+.content-container {
+    background-color: #FFFFFF;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+}
+
+/* Footer */
+footer {
+    visibility: hidden;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # --- FUNGSI UNTUK MENGAMBIL DATA DARI GOOGLE SHEETS ---
 @st.cache_data(ttl=600)
@@ -79,123 +150,152 @@ def process_data(df):
 # --- FUNGSI UNTUK MENGHITUNG TOTAL PPSA KESELURUHAN ---
 def calculate_overall_ppsa_breakdown(df):
     if df.empty:
-        return {
-            'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0
-        }
-
+        return {'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     scores = {'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
-
     sum_components = ['PSM', 'PWP', 'SG']
     for comp in sum_components:
         target_col = f'{comp} Target'
         actual_col = f'{comp} Actual'
         total_target = df[target_col].sum()
         total_actual = df[actual_col].sum()
-        
         if total_target > 0:
             acv = (total_actual / total_target) * 100
             scores[comp.lower()] = (acv * weights[comp]) / 100
-
     avg_target_apc = df['APC Target'].mean()
     avg_actual_apc = df['APC Actual'].mean()
-    
     if avg_target_apc > 0:
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
         scores['apc'] = (acv_apc * weights['APC']) / 100
-        
     scores['total'] = sum(scores.values())
     return scores
 
 # --- UI DASHBOARD ---
-# --- PERBAIKAN: JUDUL DAN DESKRIPSI YANG SUDAH BENAR ---
-st.title("📊 Dashboard PPSA")
+st.markdown('<h1 class="main-title">📊 Dashboard PPSA</h1>', unsafe_allow_html=True)
 st.markdown("""
-Dashboard untuk memantau performa indikator **PPSA** yang terdiri dari:
-- **P**SM (Produk Spesial Mingguan)
-- **P**WP (Purchase With Purchase)
-- **S**G (Serba Gratis)
-- **A**PC (Average Purchase Customer)
-""")
+<div style='text-align: center; color: #6B7280; margin-bottom: 2rem;'>
+Memantau performa indikator <strong>PPSA</strong> yang terdiri dari <strong>PSM</strong> (Produk Spesial Mingguan), <strong>PWP</strong> (Purchase With Purchase), <strong>SG</strong> (Serba Gratis), dan <strong>APC</strong> (Average Purchase Customer).
+</div>
+""", unsafe_allow_html=True)
 
 raw_df = load_data_from_gsheet()
 
 if not raw_df.empty:
     processed_df = process_data(raw_df.copy())
     
-    st.sidebar.header("Filter Data")
-    
-    if 'NAMA KASIR' in processed_df.columns:
-        selected_names = st.sidebar.multiselect(
-            "Pilih Nama Kasir:",
-            options=processed_df['NAMA KASIR'].unique(),
-            default=processed_df['NAMA KASIR'].unique()
-        )
-        filtered_df = processed_df[processed_df['NAMA KASIR'].isin(selected_names)]
-    else:
-        filtered_df = processed_df
-
-    if 'TANGGAL' in filtered_df.columns:
-        filtered_df = filtered_df.dropna(subset=['TANGGAL'])
-        if not filtered_df.empty:
-            min_date = filtered_df['TANGGAL'].min().to_pydatetime()
-            max_date = filtered_df['TANGGAL'].max().to_pydatetime()
-            
-            selected_date_range = st.sidebar.date_input(
-                "Pilih Rentang Tanggal:",
-                value=[min_date, max_date],
-                min_value=min_date,
-                max_value=max_date
+    with st.sidebar:
+        st.header("⚙️ Filter Data")
+        if 'NAMA KASIR' in processed_df.columns:
+            selected_names = st.multiselect(
+                "Pilih Nama Kasir:",
+                options=processed_df['NAMA KASIR'].unique(),
+                default=processed_df['NAMA KASIR'].unique()
             )
-            
-            if len(selected_date_range) == 2:
-                start_date, end_date = pd.to_datetime(selected_date_range[0]), pd.to_datetime(selected_date_range[1])
-                mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
-                filtered_df = filtered_df.loc[mask]
+            filtered_df = processed_df[processed_df['NAMA KASIR'].isin(selected_names)]
+        else:
+            filtered_df = processed_df
 
+        if 'TANGGAL' in filtered_df.columns:
+            filtered_df = filtered_df.dropna(subset=['TANGGAL'])
+            if not filtered_df.empty:
+                min_date = filtered_df['TANGGAL'].min().to_pydatetime()
+                max_date = filtered_df['TANGGAL'].max().to_pydatetime()
+                selected_date_range = st.date_input(
+                    "Pilih Rentang Tanggal:",
+                    value=[min_date, max_date],
+                    min_value=min_date,
+                    max_value=max_date
+                )
+                if len(selected_date_range) == 2:
+                    start_date, end_date = pd.to_datetime(selected_date_range[0]), pd.to_datetime(selected_date_range[1])
+                    mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
+                    filtered_df = filtered_df.loc[mask]
+
+    # --- RINGKASAN PERFORMA KESELURUHAN ---
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
     st.header("🏆 Ringkasan Performa Keseluruhan")
     overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    col_psm, col_pwp, col_sg, col_apc = st.columns(4)
+    col_psm, col_pwp, col_sg, col_apc = st.columns(4, gap="medium")
     with col_psm:
-        st.metric("Skor PSM", f"{overall_scores['psm']:.2f}", help="Skor dari total PSM")
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 0.9rem; color: #6B7280;">Skor PSM</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1f77b4;">{overall_scores['psm']:.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_pwp:
-        st.metric("Skor PWP", f"{overall_scores['pwp']:.2f}", help="Skor dari total PWP")
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 0.9rem; color: #6B7280;">Skor PWP</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1f77b4;">{overall_scores['pwp']:.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_sg:
-        st.metric("Skor SG", f"{overall_scores['sg']:.2f}", help="Skor dari total SG")
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 0.9rem; color: #6B7280;">Skor SG</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1f77b4;">{overall_scores['sg']:.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_apc:
-        st.metric("Skor APC", f"{overall_scores['apc']:.2f}", help="Skor dari rata-rata APC")
+        st.markdown(f"""
+        <div class="metric-card">
+            <div style="font-size: 0.9rem; color: #6B7280;">Skor APC</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1f77b4;">{overall_scores['apc']:.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    col_total, col_chart = st.columns([1, 2])
+    col_total, col_chart = st.columns([1, 2], gap="large")
     with col_total:
-        st.metric(
-            label="💰 **TOTAL PPSA**",
-            value=f"{overall_scores['total']:.2f}",
-            help="Total skor adalah jumlah dari Skor PSM, PWP, SG, dan APC."
-        )
+        st.markdown(f"""
+        <div class="metric-card" style="border-left-color: #2E8B57; text-align: center; padding: 2rem 1rem;">
+            <div style="font-size: 1.2rem; color: #6B7280; margin-bottom: 0.5rem;">💰 TOTAL PPSA</div>
+            <div style="font-size: 3rem; font-weight: 700; color: #2E8B57;">{overall_scores['total']:.2f}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col_chart:
         chart_data = {
             'Komponen': ['PSM', 'PWP', 'SG', 'APC'],
             'Skor': [overall_scores['psm'], overall_scores['pwp'], overall_scores['sg'], overall_scores['apc']]
         }
-        chart_df = pd.DataFrame(chart_data).set_index('Komponen')
-        st.bar_chart(chart_df)
+        chart_df = pd.DataFrame(chart_data)
+        fig_overall = px.bar(
+            chart_df, 
+            x='Komponen', 
+            y='Skor', 
+            color='Skor',
+            color_continuous_scale=px.colors.sequential.Blues,
+            template='plotly_white'
+        )
+        fig_overall.update_layout(showlegend=False, height=250, margin=dict(l=20, r=20, t=20, b=20))
+        st.plotly_chart(fig_overall, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True) # Tutup container
 
-    st.divider()
-
-    st.header("Data Performa Kasir")
+    # --- DATA PERFORMA KASIR ---
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
+    st.header("📈 Data Performa Kasir")
     
     st.subheader("Total Score PPSA per Kasir")
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].sum().sort_values(ascending=False)
-        st.bar_chart(score_summary)
+        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].sum().sort_values(ascending=False).reset_index()
+        fig_kasir = px.bar(
+            score_summary, 
+            x='TOTAL SCORE PPSA', 
+            y='NAMA KASIR', 
+            orientation='h',
+            color='TOTAL SCORE PPSA',
+            color_continuous_scale=px.colors.sequential.Viridis,
+            template='plotly_white'
+        )
+        fig_kasir.update_layout(showlegend=False, height=400, yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_kasir, use_container_width=True)
     else:
         st.warning("Tidak ada data untuk ditampilkan setelah difilter.")
 
-    st.subheader("Tabel Detail Perhitungan")
-    
+    st.subheader("📋 Tabel Detail Perhitungan")
     column_configuration = {
         'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
         'TANGGAL': st.column_config.DateColumn("Tanggal", format="DD.MM.YYYY", width="medium"),
@@ -225,12 +325,6 @@ if not raw_df.empty:
         'SCORE APC': st.column_config.NumberColumn("Score APC", format="%.2f"),
         'TOTAL SCORE PPSA': st.column_config.NumberColumn("TOTAL SCORE PPSA", format="%.2f"),
     }
-    
     final_column_config = {col: config for col, config in column_configuration.items() if col in filtered_df.columns}
-    
-    st.dataframe(
-        filtered_df,
-        use_container_width=True,
-        column_config=final_column_config,
-        hide_index=True
-    )
+    st.dataframe(filtered_df, use_container_width=True, column_config=final_column_config, hide_index=True)
+    st.markdown('</div>', unsafe_allow_html=True) # Tutup container
