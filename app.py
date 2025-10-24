@@ -133,53 +133,90 @@ def calculate_overall_ppsa_breakdown(df):
     scores['total'] = sum(scores.values())
     return scores
 
+# --- PERBAIKAN: INDENTASI FUNGSI AGREGASI ---
 def calculate_aggregate_scores_per_cashier(df):
-    if df.empty or 'NAMA KASIR' not in df.columns: return pd.DataFrame()
+    if df.empty or 'NAMA KASIR' not in df.columns:
+        return pd.DataFrame()
+    
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
-    agg_cols = {'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum', 'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'}
+    agg_cols = {
+        'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'
+    }
+    
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
     aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+
     def calculate_score_from_agg(row, comp):
-        total_target = row[f'{comp} Target']; total_actual = row[f'{comp} Actual']
-        if total_target == 0: return 0.0
+        total_target = row[f'{comp} Target']
+        total_actual = row[f'{comp} Actual']
+        if total_target == 0:
+            return 0.0
         acv = (total_actual / total_target) * 100
         return (acv * weights[comp]) / 100
+
     for comp in ['PSM', 'PWP', 'SG', 'APC']:
         aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
+    
     score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
+# --- PERBAIKAN: INDENTASI FUNGSI AGREGASI SHIFT ---
 def calculate_aggregate_scores_per_shift(df):
-    if df.empty or 'SHIFT' not in df.columns: return pd.DataFrame()
+    if df.empty or 'SHIFT' not in df.columns:
+        return pd.DataFrame()
+    
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
-    agg_cols = {'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum', 'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'}
+    agg_cols = {
+        'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'
+    }
+    
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
     aggregated_df = df.groupby('SHIFT')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+
     def calculate_score_from_agg(row, comp):
-        total_target = row[f'{comp} Target']; total_actual = row[f'{comp} Actual']
-        if total_target == 0: return 0.0
+        total_target = row[f'{comp} Target']
+        total_actual = row[f'{comp} Actual']
+        if total_target == 0:
+            return 0.0
         acv = (total_actual / total_target) * 100
         return (acv * weights[comp]) / 100
+
     for comp in ['PSM', 'PWP', 'SG', 'APC']:
         aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
-    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']
+    
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
 def calculate_tebus_summary_per_cashier(df):
-    if df.empty or 'NAMA KASIR' not in df.columns: return pd.DataFrame()
-    agg_cols = {'TARGET TEBUS 2500': 'sum', 'ACTUAL TEBUS 2500': 'sum'}
+    if df.empty or 'NAMA KASIR' not in df.columns:
+        return pd.DataFrame()
+    
+    agg_cols = {
+        'TARGET TEBUS 2500': 'sum',
+        'ACTUAL TEBUS 2500': 'sum'
+    }
+    
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
     aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+
     def calculate_acv_tebus(row):
-        if row['TARGET TEBUS 2500'] == 0: return 0.0
+        if row['TARGET TEBUS 2500'] == 0:
+            return 0.0
         return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
+        
     aggregated_df['(%) ACV TEBUS 2500'] = aggregated_df.apply(calculate_acv_tebus, axis=1)
+    
     return aggregated_df.sort_values(by='(%) ACV TEBUS 2500', ascending=False).reset_index(drop=True)
 
 def calculate_gap_analysis(df):
     if df.empty: return pd.DataFrame()
+    
     overall_acv = {}
     components = ['PSM', 'PWP', 'SG', 'APC']
     for comp in components:
@@ -192,30 +229,28 @@ def calculate_gap_analysis(df):
         else:
             acv = 0.0
         overall_acv[comp] = acv
+
     gap_df = pd.DataFrame(list(overall_acv.items()), columns=['Komponen', 'ACV'])
     gap_df['Target'] = 100.0
     gap_df['Gap'] = gap_df['ACV'] - gap_df['Target']
     gap_df['Warna'] = gap_df['Gap'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
+    
     return gap_df
 
 def calculate_gap_per_cashier(df):
-    if df.empty or 'NAMA KASIR' not in df.columns: return pd.DataFrame()
-    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
-    agg_cols = {'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum', 'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'}
-    valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
-    aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
-    def calculate_score_from_agg(row, comp):
-        total_target = row[f'{comp} Target']; total_actual = row[f'{comp} Actual']
-        if total_target == 0: return 0.0
-        acv = (total_actual / total_target) * 100
-        return (acv * weights[comp]) / 100
-    for comp in ['PSM', 'PWP', 'SG', 'APC']:
-        aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
-    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
-    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
-    aggregated_df['Gap Skor'] = aggregated_df['TOTAL SCORE PPSA'] - 100.0
-    aggregated_df['Warna'] = aggregated_df['Gap Skor'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
-    return aggregated_df.sort_values(by='Gap Skor', ascending=False).reset_index(drop=True)
+    if df.empty or 'NAMA KASIR' not in df.columns:
+        return pd.DataFrame()
+    
+    # Gunakan fungsi yang sudah ada untuk menghitung skor
+    score_summary = calculate_aggregate_scores_per_cashier(df)
+    
+    if score_summary.empty:
+        return pd.DataFrame()
+        
+    score_summary['Gap Skor'] = score_summary['TOTAL SCORE PPSA'] - 100.0
+    score_summary['Warna'] = score_summary['Gap Skor'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
+    
+    return score_summary.sort_values(by='Gap Skor', ascending=False).reset_index(drop=True)
 
 
 # --- UI DASHBOARD ---
@@ -276,7 +311,6 @@ if not raw_df.empty:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- PERBAIKAN: LAYOUT BARU DENGAN GAP SCORE ---
         col_actual, col_gap, col_chart = st.columns([1, 1, 2], gap="medium")
         with col_actual:
             st.markdown(f"""
@@ -289,7 +323,6 @@ if not raw_df.empty:
         with col_gap:
             gap_value = overall_scores['total'] - 100
             gap_color = '#10b981' if gap_value >= 0 else '#ef4444'
-            gap_icon_color = 'white' if gap_value >= 0 else 'white'
             st.markdown(f"""
             <div class="metric-card" style="border-left-color: {gap_color}; background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);">
                 <div class="metric-label">{get_svg_icon("tebus", size=20, color=gap_color)} GAP TO TARGET</div>
