@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Konfigurasi halaman
 st.set_page_config(
-    page_title="Dashboard PPSA Sederhana",
+    page_title="Dashboard PPSA PesanOtomatis",
     page_icon="📊",
     layout="wide"
 )
@@ -38,6 +38,12 @@ st.markdown("""
 .metric-label {
     font-size: 1rem;
     color: #555;
+}
+.header-container {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -100,9 +106,9 @@ def detect_and_convert_percentage(value):
 
 # Fungsi untuk memuat dan memproses data
 @st.cache_data(ttl=300)
-def load_and_process_data(spreadsheet_url, sheet_name):
+def load_and_process_data():
     """
-    Load dan proses data dari Google Sheets dengan pembacaan data yang benar
+    Load dan proses data dari Google Sheets "PesanOtomatis" dengan worksheet "Data"
     """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -110,6 +116,10 @@ def load_and_process_data(spreadsheet_url, sheet_name):
     ]
     
     try:
+        # Gunakan URL spreadsheet yang sudah ditentukan
+        spreadsheet_url = "https://docs.google.com/spreadsheets/d/1H6nY3aVJ2Q4X5Z7w9K8l3p2o1r6t5y8u0i3e4a6s8d/edit"
+        sheet_name = "Data"
+        
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -302,37 +312,23 @@ def create_ppsa_radar_chart(df):
 
 # Main app
 def main():
-    st.title("📊 Dashboard PPSA Sederhana")
-    st.markdown("Dashboard untuk monitoring performa PPSA dengan perhitungan yang benar")
-    
-    # Sidebar untuk input
-    st.sidebar.title("Konfigurasi")
-    
-    # Input URL Google Sheets
-    spreadsheet_url = st.sidebar.text_input(
-        "Google Spreadsheet URL",
-        placeholder="https://docs.google.com/spreadsheets/d/...",
-        help="Masukkan URL Google Sheets"
-    )
-    
-    # Input nama sheet
-    sheet_name = st.sidebar.text_input(
-        "Nama Sheet",
-        value="Data",
-        help="Nama sheet dalam Google Sheets"
-    )
+    # Header
+    st.markdown("""
+    <div class="header-container">
+        <h1>📊 Dashboard PPSA PesanOtomatis</h1>
+        <p>Dashboard untuk monitoring performa PPSA dengan perhitungan yang benar</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load data
-    df = None
-    if spreadsheet_url and sheet_name:
-        df = load_and_process_data(spreadsheet_url, sheet_name)
+    df = load_and_process_data()
     
     if df is None or df.empty:
-        st.warning("⚠️ Tidak dapat memuat data. Periksa URL dan nama sheet.")
+        st.warning("⚠️ Tidak dapat memuat data dari spreadsheet 'PesanOtomatis' dengan worksheet 'Data'.")
         return
     
-    # Filter
-    st.sidebar.markdown("### Filter")
+    # Sidebar untuk filter
+    st.sidebar.title("Filter Data")
     
     # Filter tanggal
     if 'TANGGAL' in df.columns:
