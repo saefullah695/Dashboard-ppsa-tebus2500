@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # --- FUNGSI UNTUK MENGAMBIL DATA DARI GOOGLE SHEETS ---
-@st.cache_data(ttl=600) # Cache data selama 10 menit untuk performa
+@st.cache_data(ttl=600)
 def load_data_from_gsheet():
     try:
         scopes = [
@@ -25,7 +25,7 @@ def load_data_from_gsheet():
         client = gspread.authorize(creds)
         
         spreadsheet = client.open("Dashboard")
-        worksheet = spreadsheet.get_worksheet(0) # Mengambil sheet pertama
+        worksheet = spreadsheet.get_worksheet(0)
         
         data = worksheet.get_all_values()
         if not data:
@@ -76,54 +76,46 @@ def process_data(df):
     
     return df
 
-# --- FUNGSI YANG SUDAH DIPERBAIKI: LOGIKA HYBRID (SUM UNTUK PSM/PWP/SG, MEAN UNTUK APC) ---
-def calculate_overall_ppsa_score(df):
+# --- FUNGSI YANG DIPERBAIKI: MENGEMBALIKAN DETAIL SKOR SETIAP KOMPONEN ---
+def calculate_overall_ppsa_breakdown(df):
     """
-    Menghitung total PPSA keseluruhan dengan logika hybrid:
-    - PSM, PWP, SG: dihitung dari jumlah total target dan actual.
-    - APC: dihitung dari rata-rata target dan actual.
+    Menghitung total PPSA keseluruhan dan mengembalikan skor per komponen.
+    Logika: PSM/PWP/SG (dari total), APC (dari rata-rata).
     """
     if df.empty:
-        return 0.0
+        return {
+            'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0
+        }
 
-    # Bobot Default
-    weights = {
-        'PSM': 20,
-        'PWP': 25,
-        'SG': 30,
-        'APC': 25
-    }
-    
-    total_score = 0.0
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    scores = {'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
 
-    # --- Perhitungan untuk PSM, PWP, SG (berdasarkan JUMLAH/SUM) ---
+    # Komponen PSM, PWP, SG (berdasarkan JUMLAH/SUM)
     sum_components = ['PSM', 'PWP', 'SG']
     for comp in sum_components:
         target_col = f'{comp} Target'
         actual_col = f'{comp} Actual'
-        
         total_target = df[target_col].sum()
         total_actual = df[actual_col].sum()
         
         if total_target > 0:
             acv = (total_actual / total_target) * 100
-            score = (acv * weights[comp]) / 100
-            total_score += score
+            scores[comp.lower()] = (acv * weights[comp]) / 100
 
-    # --- Perhitungan untuk APC (berdasarkan RATA-RATA/MEAN) ---
+    # Komponen APC (berdasarkan RATA-RATA/MEAN)
     avg_target_apc = df['APC Target'].mean()
     avg_actual_apc = df['APC Actual'].mean()
     
     if avg_target_apc > 0:
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
-        score_apc = (acv_apc * weights['APC']) / 100
-        total_score += score_apc
-            
-    return total_score
+        scores['apc'] = (acv_apc * weights['APC']) / 100
+        
+    scores['total'] = sum(scores.values())
+    return scores
 
 # --- UI DASHBOARD ---
-st.title("📊 Dashboard PPSA")
-st.markdown("Dashboard untuk memantau performa Penjualan Prestasi Sales Assistant (PPSA)")
+st.title("📊 Dashboard Performa PPSA")
+st.markdown("Dashboard untuk memantau performa **Penjualan Prestasi Sales Assistant (PPSA)** yang terdiri dari komponen **PSM, PWP, SG, dan APC**.")
 
 raw_df = load_data_from_gsheet()
 
@@ -160,22 +152,45 @@ if not raw_df.empty:
                 mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                 filtered_df = filtered_df.loc[mask]
 
-    # --- TAMPILKAN TOTAL PPSA KESELURUHAN DENGAN LOGIKA HYBRID ---
+    # --- PENINGKATAN: TAMPILKAN RINGKASAN DENGAN METRIK TERPERINCI ---
     st.header("🏆 Ringkasan Performa Keseluruhan")
-    total_score_keseluruhan = calculate_overall_ppsa_score(filtered_df)
+    overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+    # Tampilkan skor per komponen
+    col_psm, col_pwp, col_sg, col_apc = st.columns(4)
+    with col_psm:
+        st.metric("Skor PSM", f"{overall_scores['psm']:.2f}", help="Skor dari total PSM")
+    with col_pwp:
+        st.metric("Skor PWP", f"{overall_scores['pwp']:.2f}", help="Skor dari total PWP")
+    with col_sg:
+        st.metric("Skor SG", f"{overall_scores['sg']:.2f}", help="Skor dari total SG")
+    with col_apc:
+        st.metric("Skor APC", f"{overall_scores['apc']:.2f}", help="Skor dari rata-rata APC")
+    
+    st.markdown("---") # Garis pemisah
+    
+    # Tampilkan total skor dan grafik kontribusi
+    col_total, col_chart = st.columns([1, 2])
+    with col_total:
         st.metric(
-            label="Total PPSA Keseluruhan",
-            value=f"{total_score_keseluruhan:.2f}",
-            help="Perhitungan: PSM/PWP/SG (dari total) + APC (dari rata-rata)."
+            label="💰 **TOTAL PPSA**",
+            value=f"{overall_scores['total']:.2f}",
+            help="Total skor adalah jumlah dari Skor PSM, PWP, SG, dan APC."
         )
+    with col_chart:
+        # Data untuk grafik
+        chart_data = {
+            'Komponen': ['PSM', 'PWP', 'SG', 'APC'],
+            'Skor': [overall_scores['psm'], overall_scores['pwp'], overall_scores['sg'], overall_scores['apc']]
+        }
+        chart_df = pd.DataFrame(chart_data).set_index('Komponen')
+        st.bar_chart(chart_df)
+
     st.divider()
 
     st.header("Data Performa Kasir")
     
-    st.subheader("Total Score PPSA per Kasir")
+    st.subheader("Rata-rata Score PPSA per Kasir")
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
         score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().sort_values(ascending=False)
         st.bar_chart(score_summary)
@@ -185,10 +200,9 @@ if not raw_df.empty:
     st.subheader("Tabel Detail Perhitungan")
     
     column_configuration = {
-        'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large", help="Nama dari kasir"),
+        'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
         'TANGGAL': st.column_config.DateColumn("Tanggal", format="DD.MM.YYYY", width="medium"),
         'SHIFT': st.column_config.TextColumn("Shift", width="small"),
-        
         'PSM Target': st.column_config.NumberColumn(format="%.0f"),
         'PSM Actual': st.column_config.NumberColumn(format="%.0f"),
         'PWP Target': st.column_config.NumberColumn(format="%.0f"),
@@ -199,23 +213,20 @@ if not raw_df.empty:
         'APC Actual': st.column_config.NumberColumn(format="%.0f"),
         'TARGET TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
         'ACTUAL TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
-
-        '(%) PSM ACV': st.column_config.NumberColumn("ACV PSM (%)", format="%.2f %%", help="Persentase Pencapaian PSM"),
-        '(%) PWP ACV': st.column_config.NumberColumn("ACV PWP (%)", format="%.2f %%", help="Persentase Pencapaian PWP"),
-        '(%) SG ACV': st.column_config.NumberColumn("ACV SG (%)", format="%.2f %%", help="Persentase Pencapaian SG"),
-        '(%) APC ACV': st.column_config.NumberColumn("ACV APC (%)", format="%.2f %%", help="Persentase Pencapaian APC"),
-        '(%) ACV TEBUS 2500': st.column_config.NumberColumn("ACV Tebus 2500 (%)", format="%.2f %%", help="Persentase Pencapaian Tebus 2500"),
-
+        '(%) PSM ACV': st.column_config.NumberColumn("ACV PSM (%)", format="%.2f %%"),
+        '(%) PWP ACV': st.column_config.NumberColumn("ACV PWP (%)", format="%.2f %%"),
+        '(%) SG ACV': st.column_config.NumberColumn("ACV SG (%)", format="%.2f %%"),
+        '(%) APC ACV': st.column_config.NumberColumn("ACV APC (%)", format="%.2f %%"),
+        '(%) ACV TEBUS 2500': st.column_config.NumberColumn("ACV Tebus 2500 (%)", format="%.2f %%"),
         'BOBOT PSM': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT PWP': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT SG': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT APC': st.column_config.NumberColumn(format="%.0f"),
-        
         'SCORE PSM': st.column_config.NumberColumn("Score PSM", format="%.2f"),
         'SCORE PWP': st.column_config.NumberColumn("Score PWP", format="%.2f"),
         'SCORE SG': st.column_config.NumberColumn("Score SG", format="%.2f"),
         'SCORE APC': st.column_config.NumberColumn("Score APC", format="%.2f"),
-        'TOTAL SCORE PPSA': st.column_config.NumberColumn("TOTAL SCORE PPSA", format="%.2f", help="Total akhir score PPSA"),
+        'TOTAL SCORE PPSA': st.column_config.NumberColumn("TOTAL SCORE PPSA", format="%.2f"),
     }
     
     final_column_config = {col: config for col, config in column_configuration.items() if col in filtered_df.columns}
