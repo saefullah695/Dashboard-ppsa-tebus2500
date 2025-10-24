@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Dashboard PPSA (PSM, PWP, SG, APC)",
+    page_title="Dashboard PPSA (Produk Spesial, PWP, SG, APC)",
     page_icon="📊",
     layout="wide"
 )
@@ -108,14 +108,14 @@ def calculate_overall_ppsa_breakdown(df):
     return scores
 
 # --- UI DASHBOARD ---
-# --- PERBAIKAN 1: JUDUL DAN DESKRIPSI YANG BENAR ---
+# --- PERBAIKAN: JUDUL DAN DESKRIPSI YANG SUDAH BENAR ---
 st.title("📊 Dashboard PPSA")
 st.markdown("""
 Dashboard untuk memantau performa indikator **PPSA** yang terdiri dari:
-- **P**SM (Product Sales per Minute)
-- **P**WP (Product per Working hour)
-- **S**G (Sales Growth)
-- **A**PC (Average Purchase per Customer)
+- **P**SM (Produk Spesial Mingguan)
+- **P**WP (Purchase With Purchase)
+- **S**G (Serba Gratis)
+- **A**PC (Average Purchase Customer)
 """)
 
 raw_df = load_data_from_gsheet()
@@ -187,10 +187,8 @@ if not raw_df.empty:
 
     st.header("Data Performa Kasir")
     
-    # --- PERBAIKAN 2: GRAFIK TOTAL SCORE PER KASIR ---
     st.subheader("Total Score PPSA per Kasir")
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        # Menggunakan .sum() untuk menjumlahkan total skor per kasir
         score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].sum().sort_values(ascending=False)
         st.bar_chart(score_summary)
     else:
