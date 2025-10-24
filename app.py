@@ -16,6 +16,11 @@ import re
 import json
 from io import BytesIO
 import base64
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # =========================================================
 # ------------------- KONFIGURASI AWAL --------------------
@@ -435,16 +440,24 @@ def format_number(value: float) -> str:
     except (TypeError, ValueError):
         return "0"
 
-def convert_percentage_to_decimal(value) -> float:
+def detect_and_convert_percentage(value) -> float:
     """
-    Konversi berbagai format persentase ke desimal (0-1)
+    --- PERBAIKAN UTAMA ---
+    Deteksi dan konversi berbagai format persentase ke nilai float 0-100
     Menangani format: '85%', '85.5%', '0.85', 0.85, 85, '85,5%'
     """
     if pd.isna(value):
         return 0.0
     
     # Konversi ke string dulu untuk handling yang konsisten
-    value_str = str(value)
+    value_str = str(value).strip()
+    
+    # Jika string kosong, kembalikan 0
+    if not value_str:
+        return 0.0
+    
+    # Deteksi format persentase
+    is_percentage_format = '%' in value_str
     
     # Hapus karakter non-numerik kecuali titik dan koma
     value_str = re.sub(r'[^\d.,-]', '', value_str)
@@ -456,15 +469,20 @@ def convert_percentage_to_decimal(value) -> float:
     try:
         numeric_value = float(value_str)
     except (ValueError, TypeError):
+        logger.warning(f"Tidak dapat mengkonversi nilai '{value}' ke numerik")
         return 0.0
     
-    # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kembalikan sebagai desimal
-    # Kondisi: nilai > 0 dan nilai < 1
-    if 0 < numeric_value < 1:
+    # --- PERBAIKAN: Deteksi format data ---
+    # Jika format asli adalah persentase (%), gunakan nilai langsung
+    if is_percentage_format:
         return numeric_value
     
-    # Jika nilai adalah persentase (85, 85.5), konversi ke desimal
-    return numeric_value / 100
+    # Jika nilai adalah desimal (0 < nilai < 1), konversi ke persentase
+    if 0 < numeric_value < 1:
+        return numeric_value * 100
+    
+    # Jika nilai > 1, anggap sudah dalam format persentase
+    return numeric_value
 
 def create_metric_card(title: str, value: str, delta: str = None, 
                       delta_type: str = "neutral", icon: str = "📊") -> str:
@@ -483,7 +501,10 @@ def create_metric_card(title: str, value: str, delta: str = None,
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.DataFrame]:
-    """Load dan proses data dari Google Sheets dengan caching"""
+    """
+    --- PERBAIKAN UTAMA ---
+    Load dan proses data dari Google Sheets dengan pembacaan data yang benar
+    """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
@@ -507,7 +528,8 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         status_text.text("📊 Mengunduh data...")
         progress_bar.progress(50)
         
-        df = get_as_dataframe(worksheet, evaluate_formulas=True)
+        # --- PERBAIKAN: Ambil data mentah tanpa evaluasi formula ---
+        df = get_as_dataframe(worksheet, evaluate_formulas=False)
         
         status_text.text("🔄 Memproses data...")
         progress_bar.progress(75)
@@ -520,7 +542,7 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         if 'TANGGAL' in df.columns:
             df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce', dayfirst=True)
         
-        # Daftar semua kolom ACV yang harus dikonversi sebagai persentase
+        # --- PERBAIKAN: Daftar semua kolom ACV yang harus dikonversi sebagai persentase ---
         acv_columns = [
             'PSM ACV', 'PWP ACV', 'SG ACV', 'APC ACV', 'ACV TEBUS 2500'
         ]
@@ -532,38 +554,12 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             'TOTAL SCORE PPSA', 'TARGET TEBUS 2500', 'ACTUAL TEBUS 2500', 'JHK'
         ]
         
-        # --- PERBAIKAN UTAMA: PENANGANAN DATA PERSENTASE ---
-        # Fungsi untuk membersihkan dan mengkonversi kolom persentase
-        def convert_percentage_column(series: pd.Series) -> pd.Series:
-            """Konversi kolom persentase dari berbagai format ke angka float 0-100"""
-            # Konversi ke string dulu untuk handling yang konsisten
-            series = series.astype(str)
-            
-            # Hapus karakter non-numerik kecuali titik dan koma
-            series = series.str.replace('%', '', regex=False)
-            series = series.str.replace('[^\d.,-]', '', regex=True)
-            
-            # Ganti koma dengan titik untuk desimal
-            series = series.str.replace(',', '.', regex=False)
-            
-            # Konversi ke numeric
-            numeric_series = pd.to_numeric(series, errors='coerce')
-            
-            # Jika nilai adalah desimal (misal 0.85 dari Google Sheets format), kalikan dengan 100
-            # Kondisi: nilai > 0 dan nilai < 1
-            numeric_series = numeric_series.apply(lambda x: x * 100 if 0 < x < 1 else x)
-            
-            # --- PERBAIKAN: Batasi nilai maksimal menjadi 100% ---
-            numeric_series = numeric_series.apply(lambda x: min(x, 100) if not pd.isna(x) and x > 100 else x)
-            
-            return numeric_series
-        
-        # Konversi kolom ACV dengan fungsi baru
+        # --- PERBAIKAN: Konversi kolom ACV dengan fungsi deteksi format ---
         for col in acv_columns:
             if col in df.columns:
-                df[col] = convert_percentage_column(df[col])
+                df[col] = df[col].apply(detect_and_convert_percentage)
         
-        # Konversi kolom numerik lainnya (tanpa logika persentase)
+        # Konversi kolom numerik lainnya
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.replace('%', '').str.replace(',', '.')
@@ -584,7 +580,7 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             if bobot_col in df.columns:
                 df[bobot_col] = weight
         
-        # --- PERBAIKAN: Hitung ulang score untuk setiap indikator ---
+        # --- PERBAIKAN: Hitung ulang score untuk setiap indikator dengan formula yang benar ---
         # Score = (ACV × Bobot) / 100
         for indicator in indicator_weights.keys():
             acv_col = f'{indicator} ACV'
@@ -592,7 +588,7 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
             score_col = f'SCORE {indicator}'
             
             if acv_col in df.columns and bobot_col in df.columns:
-                # --- PERBAIKAN: Sesuaikan formula dengan permintaan user ---
+                # --- PERBAIKAN: Gunakan formula yang benar ---
                 # Score = (ACV × Bobot) / 100
                 df[score_col] = (df[acv_col] * df[bobot_col]) / 100
         
@@ -618,6 +614,7 @@ def load_and_process_data(spreadsheet_url: str, sheet_name: str) -> Optional[pd.
         
     except Exception as e:
         st.error(f"❌ Gagal memuat data: {str(e)}")
+        logger.error(f"Error loading data: {str(e)}")
         return None
 
 def filter_data(df: pd.DataFrame, filters: Dict) -> pd.DataFrame:
