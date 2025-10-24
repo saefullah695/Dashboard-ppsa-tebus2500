@@ -87,7 +87,6 @@ def process_data(df):
     if df.empty: return df
     if 'TANGGAL' in df.columns:
         df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], format='%d/%m/%Y', errors='coerce')
-        # --- TAMBAHAN: KOLOM HARI ---
         df['HARI'] = df['TANGGAL'].dt.day_name()
         hari_map = {'Monday': 'Senin', 'Tuesday': 'Selasa', 'Wednesday': 'Rabu', 'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu', 'Sunday': 'Minggu'}
         df['HARI'] = df['HARI'].map(hari_map)
@@ -168,6 +167,28 @@ def calculate_aggregate_scores_per_shift(df):
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
+# --- FUNGSI BARU: UNTUK MENGHITUNG RINGKASAN TEBUS ---
+def calculate_tebus_summary_per_cashier(df):
+    if df.empty or 'NAMA KASIR' not in df.columns:
+        return pd.DataFrame()
+
+    agg_cols = {
+        'TARGET TEBUS 2500': 'sum',
+        'ACTUAL TEBUS 2500': 'sum'
+    }
+    
+    valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
+    aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+
+    def calculate_acv_tebus(row):
+        if row['TARGET TEBUS 2500'] == 0: return 0.0
+        return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
+        
+    aggregated_df['(%) ACV TEBUS 2500'] = aggregated_df.apply(calculate_acv_tebus, axis=1)
+    
+    return aggregated_df.sort_values(by='(%) ACV TEBUS 2500', ascending=False).reset_index(drop=True)
+
+
 # --- UI DASHBOARD ---
 st.markdown(f"""
 <div class="dashboard-header">
@@ -200,10 +221,8 @@ if not raw_df.empty:
                     filtered_df = filtered_df.loc[mask]
         st.info(f"**Total Record:** {len(filtered_df)}\n\n**Kasir Terpilih:** {len(selected_names) if 'selected_names' in locals() else 0}")
 
-    # --- TAB UTAMA ---
     tab1, tab2 = st.tabs(["📈 PPSA Analytics", "🛒 Tebus (Suuegerr) Analytics"])
 
-    # --- TAB 1: PPSA ANALYTICS ---
     with tab1:
         overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
         
@@ -244,7 +263,6 @@ if not raw_df.empty:
             st.plotly_chart(fig_overall, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- SECTION: ANALISA MENDALAM ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🔍 Analisa Mendalam PPSA</h2>', unsafe_allow_html=True)
         score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
@@ -258,11 +276,9 @@ if not raw_df.empty:
             st.plotly_chart(fig_breakdown, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- SECTION: TREN & POLA PERFORMA ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">📊 Tren & Pola Performa</h2>', unsafe_allow_html=True)
         
-        # --- Skor per Tanggal ---
         st.subheader("📅 Total Skor PPSA per Tanggal")
         if not filtered_df.empty and 'TANGGAL' in filtered_df.columns:
             daily_score = filtered_df.groupby('TANGGAL')['TOTAL SCORE PPSA'].sum().reset_index()
@@ -270,7 +286,6 @@ if not raw_df.empty:
             fig_date.update_layout(yaxis_title='Total Skor PPSA', xaxis_title='Tanggal')
             st.plotly_chart(fig_date, use_container_width=True)
         
-        # --- Skor per Hari ---
         st.subheader("📆 Rata-rata Skor PPSA per Hari")
         if not filtered_df.empty and 'HARI' in filtered_df.columns:
             daily_avg = filtered_df.groupby('HARI')['TOTAL SCORE PPSA'].mean().reindex(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']).reset_index()
@@ -279,11 +294,9 @@ if not raw_df.empty:
             st.plotly_chart(fig_day_avg, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- SECTION: PERFORMA KASIR & SHIFT ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">👥 Performa Kasir & Shift</h2>', unsafe_allow_html=True)
         
-        # Performa Kasir
         st.subheader("Total Performa Kasir (Agregat)")
         if not score_summary.empty:
             score_summary['Ranking'] = range(1, len(score_summary) + 1)
@@ -293,7 +306,6 @@ if not raw_df.empty:
             fig_kasir.update_layout(template='plotly_white', height=max(400, len(score_summary) * 40), showlegend=False, xaxis_title='Total Score PPSA (Agregat)', yaxis={'categoryorder': 'total ascending'})
             st.plotly_chart(fig_kasir, use_container_width=True)
         
-        # Performa Shift
         st.subheader("Performa per Shift")
         shift_summary = calculate_aggregate_scores_per_shift(filtered_df)
         if not shift_summary.empty:
@@ -302,49 +314,48 @@ if not raw_df.empty:
             st.plotly_chart(fig_shift, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TAB 2: TEBUS (SUUEGERR) ANALYTICS ---
     with tab2:
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🛒 Performa Tebus (Suuegerr)</h2>', unsafe_allow_html=True)
         
         if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-            tebus_summary = calculate_aggregate_scores_per_cashier(filtered_df)
-            tebus_summary = tebus_summary.sort_values(by='(%) ACV TEBUS 2500', ascending=False).reset_index(drop=True)
-            tebus_summary['Ranking'] = range(1, len(tebus_summary) + 1)
-
-            # --- Overall ACV for Tebus ---
-            overall_tebus_acv = (filtered_df['ACTUAL TEBUS 2500'].sum() / filtered_df['TARGET TEBUS 2500'].sum()) * 100 if filtered_df['TARGET TEBUS 2500'].sum() > 0 else 0
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.markdown(f"""
-                <div class="total-ppsa-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                    <div class="total-ppsa-label">{get_svg_icon("tebus", size=32, color="white")} TOTAL ACV TEBUS (SUUEGERR)</div>
-                    <div class="total-ppsa-value">{overall_tebus_acv:.2f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown("---")
+            # --- PERBAIKAN: GUNAKAN FUNGSI BARU ---
+            tebus_summary = calculate_tebus_summary_per_cashier(filtered_df)
             
-            # --- Performer Chart ---
-            fig_tebus = go.Figure()
-            colors = ['#10b981' if i < 3 else '#34d399' if i < 5 else '#a8a8a8' for i in range(len(tebus_summary))]
-            fig_tebus.add_trace(go.Bar(y=tebus_summary['NAMA KASIR'], x=tebus_summary['(%) ACV TEBUS 2500'], orientation='h', marker=dict(color=colors), text=[f"#{rank} - {score:.2f}%" for rank, score in zip(tebus_summary['Ranking'], tebus_summary['(%) ACV TEBUS 2500'])], textposition='outside'))
-            fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), showlegend=False, xaxis_title='ACV Tebus (Suuegerr) (%)', yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig_tebus, use_container_width=True)
+            if not tebus_summary.empty:
+                overall_tebus_acv = (filtered_df['ACTUAL TEBUS 2500'].sum() / filtered_df['TARGET TEBUS 2500'].sum()) * 100 if filtered_df['TARGET TEBUS 2500'].sum() > 0 else 0
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    st.markdown(f"""
+                    <div class="total-ppsa-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <div class="total-ppsa-label">{get_svg_icon("tebus", size=32, color="white")} TOTAL ACV TEBUS (SUUEGERR)</div>
+                        <div class="total-ppsa-value">{overall_tebus_acv:.2f}%</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown("---")
+                
+                fig_tebus = go.Figure()
+                colors = ['#10b981' if i < 3 else '#34d399' if i < 5 else '#a8a8a8' for i in range(len(tebus_summary))]
+                tebus_summary['Ranking'] = range(1, len(tebus_summary) + 1)
+                fig_tebus.add_trace(go.Bar(y=tebus_summary['NAMA KASIR'], x=tebus_summary['(%) ACV TEBUS 2500'], orientation='h', marker=dict(color=colors), text=[f"#{rank} - {score:.2f}%" for rank, score in zip(tebus_summary['Ranking'], tebus_summary['(%) ACV TEBUS 2500'])], textposition='outside'))
+                fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), showlegend=False, xaxis_title='ACV Tebus (Suuegerr) (%)', yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig_tebus, use_container_width=True)
 
-            # --- Top 3 ---
-            st.markdown("#### 🛒 Top 3 Performers (Tebus Suuegerr)")
-            cols = st.columns(3)
-            medals = ["🥇", "🥈", "🥉"]
-            for idx, (col, medal) in enumerate(zip(cols, medals)):
-                if idx < len(tebus_summary):
-                    with col:
-                        st.markdown(f"""
-                        <div class="metric-card" style="text-align: center;">
-                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{medal}</div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 0.25rem;">{tebus_summary.iloc[idx]['NAMA KASIR']}</div>
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                st.markdown("#### 🛒 Top 3 Performers (Tebus Suuegerr)")
+                cols = st.columns(3)
+                medals = ["🥇", "🥈", "🥉"]
+                for idx, (col, medal) in enumerate(zip(cols, medals)):
+                    if idx < len(tebus_summary):
+                        with col:
+                            st.markdown(f"""
+                            <div class="metric-card" style="text-align: center;">
+                                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{medal}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 0.25rem;">{tebus_summary.iloc[idx]['NAMA KASIR']}</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+            else:
+                st.warning("Tidak ada data Tebus (Suuegerr) untuk ditampilkan.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 else:
