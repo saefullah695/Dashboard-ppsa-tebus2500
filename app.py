@@ -45,6 +45,21 @@ st.markdown("""
     border-radius: 10px;
     margin-bottom: 20px;
 }
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.data-table th, .data-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+.data-table th {
+    background-color: #f2f2f2;
+}
+.data-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -140,7 +155,7 @@ def load_and_process_data():
         
         # Daftar kolom ACV yang harus dikonversi sebagai persentase
         acv_columns = [
-            'PSM ACV', 'PWP ACV', 'SG ACV', 'APC ACV'
+            'ACV', 'ACV PWP', 'ACV SG', 'ACV APC', 'ACV TEBUS 2500'
         ]
         
         # Konversi kolom ACV dengan fungsi deteksi format
@@ -176,7 +191,7 @@ def load_and_process_data():
         # Hitung score untuk setiap indikator dengan formula yang benar
         # Score = (ACV × Bobot) / 100
         for indicator in indicator_weights.keys():
-            acv_col = f'{indicator} ACV'
+            acv_col = f'ACV {indicator}' if indicator != 'PSM' else 'ACV'
             bobot_col = f'BOBOT {indicator}'
             score_col = f'SCORE {indicator}'
             
@@ -266,7 +281,7 @@ def create_ppsa_radar_chart(df):
     labels = []
     
     for indicator in indicators:
-        acv_col = f'{indicator} ACV'
+        acv_col = f'ACV {indicator}' if indicator != 'PSM' else 'ACV'
         if acv_col in df.columns:
             avg_acv = df[acv_col].mean()
             
@@ -326,6 +341,11 @@ def main():
     if df is None or df.empty:
         st.warning("⚠️ Tidak dapat memuat data dari spreadsheet 'PesanOtomatis' dengan worksheet 'Data'.")
         return
+    
+    # Tampilkan struktur kolom untuk debugging
+    with st.expander("Struktur Kolom Data"):
+        st.write("Kolom yang ditemukan dalam data:")
+        st.write(df.columns.tolist())
     
     # Sidebar untuk filter
     st.sidebar.title("Filter Data")
@@ -421,7 +441,7 @@ def main():
     
     # Tambahkan kolom ACV
     for indicator in ['PSM', 'PWP', 'SG', 'APC']:
-        acv_col = f'{indicator} ACV'
+        acv_col = f'ACV {indicator}' if indicator != 'PSM' else 'ACV'
         if acv_col in filtered_df.columns:
             display_cols.append(acv_col)
     
@@ -451,7 +471,7 @@ def main():
         
         # Format kolom ACV
         for indicator in ['PSM', 'PWP', 'SG', 'APC']:
-            acv_col = f'{indicator} ACV'
+            acv_col = f'ACV {indicator}' if indicator != 'PSM' else 'ACV'
             if acv_col in display_df.columns:
                 display_df[acv_col] = display_df[acv_col].apply(lambda x: format_percentage(x))
         
@@ -492,7 +512,7 @@ def main():
             calc_df['Nama Kasir'] = example_data['NAMA KASIR']
         
         for indicator in ['PSM', 'PWP', 'SG', 'APC']:
-            acv_col = f'{indicator} ACV'
+            acv_col = f'ACV {indicator}' if indicator != 'PSM' else 'ACV'
             bobot_col = f'BOBOT {indicator}'
             score_col = f'SCORE {indicator}'
             
