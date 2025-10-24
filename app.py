@@ -167,26 +167,67 @@ def calculate_aggregate_scores_per_shift(df):
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
-# --- FUNGSI BARU: UNTUK MENGHITUNG RINGKASAN TEBUS ---
 def calculate_tebus_summary_per_cashier(df):
-    if df.empty or 'NAMA KASIR' not in df.columns:
-        return pd.DataFrame()
-
-    agg_cols = {
-        'TARGET TEBUS 2500': 'sum',
-        'ACTUAL TEBUS 2500': 'sum'
-    }
-    
+    if df.empty or 'NAMA KASIR' not in df.columns: return pd.DataFrame()
+    agg_cols = {'TARGET TEBUS 2500': 'sum', 'ACTUAL TEBUS 2500': 'sum'}
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
     aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
-
     def calculate_acv_tebus(row):
         if row['TARGET TEBUS 2500'] == 0: return 0.0
         return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
-        
     aggregated_df['(%) ACV TEBUS 2500'] = aggregated_df.apply(calculate_acv_tebus, axis=1)
-    
     return aggregated_df.sort_values(by='(%) ACV TEBUS 2500', ascending=False).reset_index(drop=True)
+
+# --- FUNGSI BARU: UNTUK MENGHITUNG GAP ---
+def calculate_gap_analysis(df):
+    if df.empty: return pd.DataFrame()
+    
+    # Hitung ACV keseluruhan untuk setiap komponen
+    overall_acv = {}
+    components = ['PSM', 'PWP', 'SG', 'APC']
+    for comp in components:
+        target_col = f'{comp} Target'
+        actual_col = f'{comp} Actual'
+        total_target = df[target_col].sum()
+        total_actual = df[actual_col].sum()
+        if total_target > 0:
+            acv = (total_actual / total_target) * 100
+        else:
+            acv = 0.0
+        overall_acv[comp] = acv
+
+    gap_df = pd.DataFrame(list(overall_acv.items()), columns=['Komponen', 'ACV'])
+    gap_df['Target'] = 100.0
+    gap_df['Gap'] = gap_df['ACV'] - gap_df['Target']
+    gap_df['Warna'] = gap_df['Gap'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
+    
+    return gap_df
+
+def calculate_gap_per_cashier(df):
+    if df.empty or 'NAMA KASIR' not in df.columns: return pd.DataFrame()
+    
+    # Agregasi data per kasir
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    agg_cols = {'PSM Target': 'sum', 'PSM Actual': 'sum', 'PWP Target': 'sum', 'PWP Actual': 'sum', 'SG Target': 'sum', 'SG Actual': 'sum', 'APC Target': 'mean', 'APC Actual': 'mean'}
+    valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
+    aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+    
+    # Hitung total skor per kasir
+    def calculate_score_from_agg(row, comp):
+        total_target = row[f'{comp} Target']; total_actual = row[f'{comp} Actual']
+        if total_target == 0: return 0.0
+        acv = (total_actual / total_target) * 100
+        return (acv * weights[comp]) / 100
+    for comp in ['PSM', 'PWP', 'SG', 'APC']:
+        aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
+    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    
+    # Hitung gap skor
+    aggregated_df['Gap Skor'] = aggregated_df['TOTAL SCORE PPSA'] - 100.0
+    aggregated_df['Warna'] = aggregated_df['Gap Skor'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
+    
+    return aggregated_df.sort_values(by='Gap Skor', ascending=False).reset_index(drop=True)
 
 
 # --- UI DASHBOARD ---
@@ -229,12 +270,14 @@ if not raw_df.empty:
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🏆 Ringkasan Performa Keseluruhan</h2>', unsafe_allow_html=True)
         
-        col1, col2, col3, col4 = st.columns(4, gap="small")
+        # --- PERBAIKAN: TAMBAHKAN TARGET SCORE ---
+        col1, col2, col3, col4, col5 = st.columns(5, gap="small")
         metrics = [
             {"label": "PSM Score", "value": overall_scores['psm'], "icon": "psm", "col": col1},
             {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "pwp", "col": col2},
             {"label": "SG Score", "value": overall_scores['sg'], "icon": "sg", "col": col3},
-            {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4}
+            {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4},
+            {"label": "Target Score", "value": 100.0, "icon": "trophy", "col": col5}
         ]
         for metric in metrics:
             with metric["col"]:
@@ -261,6 +304,44 @@ if not raw_df.empty:
             fig_overall.add_trace(go.Scatter(name='Target', x=chart_data['Komponen'], y=chart_data['Target'], mode='markers+lines', marker=dict(size=12, color='#ef4444', symbol='diamond'), line=dict(color='#ef4444', width=2, dash='dash')))
             fig_overall.update_layout(template='plotly_white', height=300, margin=dict(l=20, r=20, t=40, b=20), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), yaxis_title='Skor')
             st.plotly_chart(fig_overall, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # --- TAMBAHAN: SECTION GAP ANALYSIS ---
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">📉 Gap Analysis (Target 100%)</h2>', unsafe_allow_html=True)
+        
+        # Gap Keseluruhan
+        st.subheader("Gap Indikator Keseluruhan")
+        gap_df = calculate_gap_analysis(filtered_df)
+        if not gap_df.empty:
+            fig_gap_overall = go.Figure()
+            fig_gap_overall.add_trace(go.Bar(
+                x=gap_df['Komponen'], 
+                y=gap_df['Gap'], 
+                marker_color=gap_df['Warna'],
+                text=gap_df['Gap'].round(2),
+                textposition='outside',
+                textfont=dict(color='#1e293b', weight='bold')
+            ))
+            fig_gap_overall.update_layout(template='plotly_white', height=300, yaxis_title='Gap (ACV - 100%)', xaxis_title='Komponen')
+            st.plotly_chart(fig_gap_overall, use_container_width=True)
+        
+        # Gap per Kasir
+        st.subheader("Gap Skor PPSA per Kasir")
+        gap_cashier_df = calculate_gap_per_cashier(filtered_df)
+        if not gap_cashier_df.empty:
+            fig_gap_cashier = go.Figure()
+            fig_gap_cashier.add_trace(go.Bar(
+                y=gap_cashier_df['NAMA KASIR'], 
+                x=gap_cashier_df['Gap Skor'], 
+                orientation='h',
+                marker_color=gap_cashier_df['Warna'],
+                text=[f"{score:.2f}" for score in gap_cashier_df['Gap Skor']],
+                textposition='outside',
+                textfont=dict(size=11, color='#1e293b', weight='bold')
+            ))
+            fig_gap_cashier.update_layout(template='plotly_white', height=max(400, len(gap_cashier_df) * 40), showlegend=False, xaxis_title='Gap Skor (Skor - 100)', yaxis={'categoryorder': 'total ascending'})
+            st.plotly_chart(fig_gap_cashier, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
@@ -319,7 +400,6 @@ if not raw_df.empty:
         st.markdown('<h2 class="section-header">🛒 Performa Tebus (Suuegerr)</h2>', unsafe_allow_html=True)
         
         if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-            # --- PERBAIKAN: GUNAKAN FUNGSI BARU ---
             tebus_summary = calculate_tebus_summary_per_cashier(filtered_df)
             
             if not tebus_summary.empty:
@@ -354,6 +434,26 @@ if not raw_df.empty:
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%</div>
                             </div>
                             """, unsafe_allow_html=True)
+                
+                # --- TAMBAHAN: GAP ANALYSIS UNTUK TEBUS ---
+                st.markdown("---")
+                st.subheader("📉 Gap Analysis Tebus (Target 100%)")
+                tebus_summary['Gap'] = tebus_summary['(%) ACV TEBUS 2500'] - 100.0
+                tebus_summary['Warna'] = tebus_summary['Gap'].apply(lambda x: '#10b981' if x >= 0 else '#ef4444')
+                
+                fig_gap_tebus = go.Figure()
+                fig_gap_tebus.add_trace(go.Bar(
+                    y=tebus_summary['NAMA KASIR'], 
+                    x=tebus_summary['Gap'], 
+                    orientation='h',
+                    marker_color=tebus_summary['Warna'],
+                    text=[f"{gap:.2f}%" for gap in tebus_summary['Gap']],
+                    textposition='outside',
+                    textfont=dict(size=11, color='#1e293b', weight='bold')
+                ))
+                fig_gap_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), showlegend=False, xaxis_title='Gap (ACV - 100%)', yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig_gap_tebus, use_container_width=True)
+
             else:
                 st.warning("Tidak ada data Tebus (Suuegerr) untuk ditampilkan.")
         st.markdown('</div>', unsafe_allow_html=True)
