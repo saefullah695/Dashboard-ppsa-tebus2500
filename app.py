@@ -45,20 +45,19 @@ st.markdown("""
     border-radius: 10px;
     margin-bottom: 20px;
 }
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
+.error-message {
+    background-color: #ffebee;
+    border-left: 5px solid #f44336;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
 }
-.data-table th, .data-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-.data-table th {
-    background-color: #f2f2f2;
-}
-.data-table tr:nth-child(even) {
-    background-color: #f9f9f9;
+.success-message {
+    background-color: #e8f5e9;
+    border-left: 5px solid #4caf50;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -119,11 +118,10 @@ def detect_and_convert_percentage(value):
     # Jika nilai > 1, anggap sudah dalam format persentase
     return numeric_value
 
-# Fungsi untuk memuat dan memproses data
-@st.cache_data(ttl=300)
-def load_and_process_data():
+# Fungsi untuk test koneksi ke Google Sheets
+def test_google_sheets_connection(spreadsheet_url, sheet_name):
     """
-    Load dan proses data dari Google Sheets "PesanOtomatis" dengan worksheet "Data"
+    Test koneksi ke Google Sheets dan return pesan error/sukses
     """
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -131,10 +129,42 @@ def load_and_process_data():
     ]
     
     try:
-        # Gunakan URL spreadsheet yang sudah ditentukan
-        spreadsheet_url = "https://docs.google.com/spreadsheets/d/1H6nY3aVJ2Q4X5Z7w9K8l3p2o1r6t5y8u0i3e4a6s8d/edit"
-        sheet_name = "Data"
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
         
+        # Test buka spreadsheet
+        spreadsheet = client.open_by_url(spreadsheet_url)
+        
+        # Test buka worksheet
+        worksheet = spreadsheet.worksheet(sheet_name)
+        
+        # Test ambil 1 baris data
+        data = worksheet.row_values(1)
+        
+        return True, "✅ Koneksi berhasil! Spreadsheet dan worksheet ditemukan."
+        
+    except gspread.exceptions.SpreadsheetNotFound:
+        return False, "❌ **Error: Spreadsheet tidak ditemukan.** Periksa URL dan pastikan Service Account telah diberi akses (setidaknya Viewer)."
+    except gspread.exceptions.WorksheetNotFound:
+        return False, f"❌ **Error: Worksheet '{sheet_name}' tidak ditemukan.** Periksa nama worksheet (case-sensitive, tanpa spasi ekstra)."
+    except gspread.exceptions.GSpreadException as e:
+        return False, f"❌ **Error GSpread:** {str(e)}. Pastikan Google Sheets API dan Google Drive API telah diaktifkan di Google Cloud Console."
+    except Exception as e:
+        return False, f"❌ **Error Tidak Dikenal:** {str(e)}. Periksa kembali konfigurasi Anda."
+
+# Fungsi untuk memuat dan memproses data
+@st.cache_data(ttl=300)
+def load_and_process_data(spreadsheet_url, sheet_name):
+    """
+    Load dan proses data dari Google Sheets
+    """
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    try:
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -208,12 +238,12 @@ def load_and_process_data():
                 df['SCORE APC'].fillna(0)
             )
         
-        return df
+        return df, None  # Return dataframe dan None untuk error
         
     except Exception as e:
-        st.error(f"❌ Gagal memuat data: {str(e)}")
+        error_message = f"❌ Gagal memuat data: {str(e)}"
         logger.error(f"Error loading data: {str(e)}")
-        return None
+        return None, error_message
 
 # Fungsi untuk filter data
 def filter_data(df, start_date=None, end_date=None, selected_cashiers=None):
@@ -335,11 +365,65 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
+    # Sidebar untuk konfigurasi
+    st.sidebar.title("Konfigurasi Koneksi")
+    
+    # Input URL Google Sheets
+    spreadsheet_url = st.sidebar.text_input(
+        "Google Spreadsheet URL",
+        value="https://docs.google.com/spreadsheets/d/1H6nY3aVJ2Q4X5Z7w9K8l3p2o1r6t5y8u0i3e4a6s8d/edit",
+        help="Masukkan URL Google Spreadsheet lengkap"
+    )
+    
+    # Input nama sheet
+    sheet_name = st.sidebar.text_input(
+        "Nama Worksheet",
+        value="Data",
+        help="Nama worksheet dalam Google Spreadsheet (case-sensitive)"
+    )
+    
+    # Tombol test koneksi
+    if st.sidebar.button("🔍 Test Koneksi"):
+        with st.spinner("Menguji koneksi..."):
+            success, message = test_google_sheets_connection(spreadsheet_url, sheet_name)
+            if success:
+                st.sidebar.markdown(f'<div class="success-message">{message}</div>', unsafe_allow_html=True)
+            else:
+                st.sidebar.markdown(f'<div class="error-message">{message}</div>', unsafe_allow_html=True)
+    
+    # Troubleshooting
+    with st.sidebar.expander("🛠️ Troubleshooting"):
+        st.markdown("""
+        **Jika koneksi gagal, periksa:**
+        
+        1. **Akses Service Account:**
+           - Buka Google Sheet Anda
+           - Klik "Share" -> "Add people and groups"
+           - Masukkan email Service Account (dari `secrets.toml`)
+           - Berikan akses minimal "Viewer"
+        
+        2. **API Google Cloud:**
+           - Pastikan Google Sheets API dan Google Drive API aktif
+           - Di Google Cloud Console -> APIs & Services -> Library
+        
+        3. **Nama Worksheet:**
+           - Pastikan nama worksheet persis sama (case-sensitive)
+           - Tidak ada spasi di awal/akhir
+        """)
+    
     # Load data
-    df = load_and_process_data()
+    df = None
+    error_message = None
+    
+    if spreadsheet_url and sheet_name:
+        df, error_message = load_and_process_data(spreadsheet_url, sheet_name)
+    
+    if error_message:
+        st.markdown(f'<div class="error-message">{error_message}</div>', unsafe_allow_html=True)
+        return
     
     if df is None or df.empty:
-        st.warning("⚠️ Tidak dapat memuat data dari spreadsheet 'PesanOtomatis' dengan worksheet 'Data'.")
+        st.warning("⚠️ Tidak dapat memuat data. Periksa konfigurasi koneksi di sidebar.")
         return
     
     # Tampilkan struktur kolom untuk debugging
@@ -348,6 +432,7 @@ def main():
         st.write(df.columns.tolist())
     
     # Sidebar untuk filter
+    st.sidebar.markdown("---")
     st.sidebar.title("Filter Data")
     
     # Filter tanggal
