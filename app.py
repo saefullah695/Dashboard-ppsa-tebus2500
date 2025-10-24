@@ -387,7 +387,9 @@ def calculate_aggregate_scores_per_cashier(df):
     
     # Lakukan agregasi per kasir
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
-    aggregated_df = df.groupby('NAMA KASIR')[valid_agg_cols.keys()].agg(valid_agg_cols).reset_index()
+    
+    # --- PERBAIKAN: KONVERSI KE LIST UNTUK MENGHINDARI ERROR ---
+    aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
 
     # Fungsi untuk menghitung skor dari data agregat
     def calculate_score_from_agg(row, comp):
@@ -585,11 +587,9 @@ if not raw_df.empty:
 
     # --- DATA PERFORMA KASIR ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    # --- PERBAIKAN: UBAH JUDUL MENJADI PERFORMA AGREGAT ---
     st.markdown('<h2 class="section-header">📈 Total Performa Kasir (Agregat)</h2>', unsafe_allow_html=True)
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        # --- PERBAIKAN UTAMA: GUNAKAN FUNGSI BARU UNTUK MENGHITUNG SKOR AGREGAT ---
         score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
         
         # Tambah ranking
@@ -621,7 +621,6 @@ if not raw_df.empty:
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
             showlegend=False,
-            # --- PERBAIKAN: UBAH JUDUL SUMBU X ---
             xaxis=dict(
                 showgrid=True,
                 gridcolor='rgba(0,0,0,0.05)',
