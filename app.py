@@ -13,8 +13,6 @@ st.set_page_config(
 # --- FUNGSI UNTUK MENGAMBIL DATA DARI GOOGLE SHEETS ---
 @st.cache_data(ttl=600) # Cache data selama 10 menit untuk performa
 def load_data_from_gsheet():
-    # Menggunakan st.secrets untuk keamanan kredensial
-    # Konfigurasi ini akan diatur di Streamlit Community Cloud
     try:
         scopes = [
             'https://www.googleapis.com/auth/spreadsheets',
@@ -26,11 +24,9 @@ def load_data_from_gsheet():
         )
         client = gspread.authorize(creds)
         
-        # Buka spreadsheet berdasarkan nama
         spreadsheet = client.open("Dashboard")
         worksheet = spreadsheet.get_worksheet(0) # Mengambil sheet pertama
         
-        # Ambil semua data dan konversi ke DataFrame
         data = worksheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
         return df
@@ -40,6 +36,11 @@ def load_data_from_gsheet():
 
 # --- FUNGSI UNTUK MEMPROSES DATA DAN MENGHITUNG SCORE ---
 def process_data(df):
+    # --- PERBAIKAN 1: PEMBACAAN TANGGAL ---
+    # Konversi kolom TANGGAL ke datetime dengan format DD/MM/YYYY
+    if 'TANGGAL' in df.columns:
+        df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], format='%d/%m/%Y', errors='coerce')
+
     # Daftar kolom yang perlu dikonversi ke numerik
     numeric_cols = [
         'PSM Target', 'PSM Actual', 'BOBOT PSM', 'PWP Target', 'PWP Actual', 'BOBOT PWP',
@@ -102,9 +103,7 @@ if raw_df is not None:
         filtered_df = processed_df
 
     # Filter berdasarkan Tanggal
-    if 'TANGGAL' in filtered_df.columns:
-        # Konversi kolom TANGGAL ke datetime
-        filtered_df['TANGGAL'] = pd.to_datetime(filtered_df['TANGGAL'], errors='coerce')
+    if 'TANGGAL' in filtered_df.columns and not filtered_df['TANGGAL'].isnull().all():
         min_date = filtered_df['TANGGAL'].min().to_pydatetime()
         max_date = filtered_df['TANGGAL'].max().to_pydatetime()
         
@@ -131,4 +130,22 @@ if raw_df is not None:
     
     # Tampilkan Tabel Detail
     st.subheader("Tabel Detail Perhitungan")
-    st.dataframe(filtered_df, use_container_width=True)
+    
+    # --- PERBAIKAN 2: FORMAT TAMPILAN PERSEN ---
+    # Buat dictionary untuk format kolom
+    # Kolom persentase akan ditampilkan dengan 2 angka di belakang koma dan simbol %
+    # Kolom score akan ditampilkan dengan 2 angka di belakang koma
+    format_dict = {
+        '(%) PSM ACV': "{:.2f}%",
+        '(%) PWP ACV': "{:.2f}%",
+        '(%) SG ACV': "{:.2f}%",
+        '(%) APC ACV': "{:.2f}%",
+        '(%) ACV TEBUS 2500': "{:.2f}%",
+        'SCORE PSM': "{:.2f}",
+        'SCORE PWP': "{:.2f}",
+        'SCORE SG': "{:.2f}",
+        'SCORE APC': "{:.2f}",
+        'TOTAL SCORE PPSA': "{:.2f}"
+    }
+    
+    st.dataframe(filtered_df, use_container_width=True, format=format_dict)
