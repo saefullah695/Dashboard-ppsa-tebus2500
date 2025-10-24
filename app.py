@@ -76,10 +76,12 @@ def process_data(df):
     
     return df
 
-# --- FUNGSI BARU: UNTUK MENGHITUNG TOTAL PPSA KESELURUHAN ---
+# --- FUNGSI YANG SUDAH DIPERBAIKI: LOGIKA HYBRID (SUM UNTUK PSM/PWP/SG, MEAN UNTUK APC) ---
 def calculate_overall_ppsa_score(df):
     """
-    Menghitung total PPSA dari keseluruhan data yang difilter.
+    Menghitung total PPSA keseluruhan dengan logika hybrid:
+    - PSM, PWP, SG: dihitung dari jumlah total target dan actual.
+    - APC: dihitung dari rata-rata target dan actual.
     """
     if df.empty:
         return 0.0
@@ -94,10 +96,9 @@ def calculate_overall_ppsa_score(df):
     
     total_score = 0.0
 
-    # --- Perhitungan untuk setiap komponen ---
-    components = ['PSM', 'PWP', 'SG', 'APC']
-    
-    for comp in components:
+    # --- Perhitungan untuk PSM, PWP, SG (berdasarkan JUMLAH/SUM) ---
+    sum_components = ['PSM', 'PWP', 'SG']
+    for comp in sum_components:
         target_col = f'{comp} Target'
         actual_col = f'{comp} Actual'
         
@@ -108,6 +109,15 @@ def calculate_overall_ppsa_score(df):
             acv = (total_actual / total_target) * 100
             score = (acv * weights[comp]) / 100
             total_score += score
+
+    # --- Perhitungan untuk APC (berdasarkan RATA-RATA/MEAN) ---
+    avg_target_apc = df['APC Target'].mean()
+    avg_actual_apc = df['APC Actual'].mean()
+    
+    if avg_target_apc > 0:
+        acv_apc = (avg_actual_apc / avg_target_apc) * 100
+        score_apc = (acv_apc * weights['APC']) / 100
+        total_score += score_apc
             
     return total_score
 
@@ -150,19 +160,18 @@ if not raw_df.empty:
                 mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                 filtered_df = filtered_df.loc[mask]
 
-    # --- TAMBAHAN: TAMPILKAN TOTAL PPSA KESELURUHAN ---
+    # --- TAMPILKAN TOTAL PPSA KESELURUHAN DENGAN LOGIKA HYBRID ---
     st.header("🏆 Ringkasan Performa Keseluruhan")
     total_score_keseluruhan = calculate_overall_ppsa_score(filtered_df)
     
-    # Menggunakan st.columns untuk menempatkan metric di tengah
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.metric(
             label="Total PPSA Keseluruhan",
             value=f"{total_score_keseluruhan:.2f}",
-            help="Total skor PPSA dihitung dari jumlah seluruh target dan actual pada data yang difilter."
+            help="Perhitungan: PSM/PWP/SG (dari total) + APC (dari rata-rata)."
         )
-    st.divider() # Garis pemisah
+    st.divider()
 
     st.header("Data Performa Kasir")
     
