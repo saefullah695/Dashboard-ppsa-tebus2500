@@ -30,23 +30,21 @@ def load_data_from_gsheet():
         data = worksheet.get_all_values()
         if not data:
             st.warning("Spreadsheet kosong atau tidak ada data yang ditemukan.")
-            return pd.DataFrame() # Kembalikan DataFrame kosong
+            return pd.DataFrame()
         df = pd.DataFrame(data[1:], columns=data[0])
         return df
     except Exception as e:
         st.error(f"Gagal mengambil data dari Google Sheets: {e}")
-        return pd.DataFrame() # Kembalikan DataFrame kosong jika error
+        return pd.DataFrame()
 
 # --- FUNGSI UNTUK MEMPROSES DATA DAN MENGHITUNG SCORE ---
 def process_data(df):
     if df.empty:
         return df
 
-    # Konversi kolom TANGGAL ke datetime dengan format DD/MM/YYYY
     if 'TANGGAL' in df.columns:
         df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], format='%d/%m/%Y', errors='coerce')
 
-    # Daftar kolom yang perlu dikonversi ke numerik
     numeric_cols = [
         'PSM Target', 'PSM Actual', 'BOBOT PSM', 'PWP Target', 'PWP Actual', 'BOBOT PWP',
         'SG Target', 'SG Actual', 'BOBOT SG', 'APC Target', 'APC Actual', 'BOBOT APC',
@@ -57,26 +55,22 @@ def process_data(df):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-    # Fungsi helper untuk menghitung ACV (Actual vs Target)
     def calculate_acv(actual, target):
         if target == 0:
             return 0.0
         return (actual / target) * 100
 
-    # Hitung kolom ACV
     df['(%) PSM ACV'] = df.apply(lambda row: calculate_acv(row['PSM Actual'], row['PSM Target']), axis=1)
     df['(%) PWP ACV'] = df.apply(lambda row: calculate_acv(row['PWP Actual'], row['PWP Target']), axis=1)
     df['(%) SG ACV'] = df.apply(lambda row: calculate_acv(row['SG Actual'], row['SG Target']), axis=1)
     df['(%) APC ACV'] = df.apply(lambda row: calculate_acv(row['APC Actual'], row['APC Target']), axis=1)
     df['(%) ACV TEBUS 2500'] = df.apply(lambda row: calculate_acv(row['ACTUAL TEBUS 2500'], row['TARGET TEBUS 2500']), axis=1)
 
-    # Rumus: Score = (ACV × Bobot) / 100
     df['SCORE PSM'] = (df['(%) PSM ACV'] * df['BOBOT PSM']) / 100
     df['SCORE PWP'] = (df['(%) PWP ACV'] * df['BOBOT PWP']) / 100
     df['SCORE SG'] = (df['(%) SG ACV'] * df['BOBOT SG']) / 100
     df['SCORE APC'] = (df['(%) APC ACV'] * df['BOBOT APC']) / 100
     
-    # Total Score PPSA
     score_cols = ['SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']
     df['TOTAL SCORE PPSA'] = df[score_cols].sum(axis=1)
     
@@ -86,17 +80,13 @@ def process_data(df):
 st.title("📊 Dashboard PPSA")
 st.markdown("Dashboard untuk memantau performa Penjualan Prestasi Sales Assistant (PPSA)")
 
-# Muat data
 raw_df = load_data_from_gsheet()
 
 if not raw_df.empty:
-    # Proses data
     processed_df = process_data(raw_df.copy())
     
-    # --- SIDEBAR UNTUK FILTER ---
     st.sidebar.header("Filter Data")
     
-    # Filter berdasarkan Nama Kasir
     if 'NAMA KASIR' in processed_df.columns:
         selected_names = st.sidebar.multiselect(
             "Pilih Nama Kasir:",
@@ -107,11 +97,8 @@ if not raw_df.empty:
     else:
         filtered_df = processed_df
 
-    # Filter berdasarkan Tanggal
     if 'TANGGAL' in filtered_df.columns:
-        # Hapus baris di mana konversi tanggal gagal (menjadi NaT)
         filtered_df = filtered_df.dropna(subset=['TANGGAL'])
-
         if not filtered_df.empty:
             min_date = filtered_df['TANGGAL'].min().to_pydatetime()
             max_date = filtered_df['TANGGAL'].max().to_pydatetime()
@@ -128,10 +115,8 @@ if not raw_df.empty:
                 mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                 filtered_df = filtered_df.loc[mask]
 
-    # --- TAMPILKAN DATA ---
     st.header("Data Performa Kasir")
     
-    # Tampilkan Total Score PPSA per Kasir
     st.subheader("Total Score PPSA per Kasir")
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
         score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().sort_values(ascending=False)
@@ -139,27 +124,56 @@ if not raw_df.empty:
     else:
         st.warning("Tidak ada data untuk ditampilkan setelah difilter.")
 
-    # Tampilkan Tabel Detail
     st.subheader("Tabel Detail Perhitungan")
     
-    # --- PERBAIKAN UTAMA: MEMBUAT FORMAT DICT YANG DINAMIS ---
-    # Definisikan semua kemungkinan format yang diinginkan
-    potential_formats = {
-        '(%) PSM ACV': "{:.2f}%",
-        '(%) PWP ACV': "{:.2f}%",
-        '(%) SG ACV': "{:.2f}%",
-        '(%) APC ACV': "{:.2f}%",
-        '(%) ACV TEBUS 2500': "{:.2f}%",
-        'SCORE PSM': "{:.2f}",
-        'SCORE PWP': "{:.2f}",
-        'SCORE SG': "{:.2f}",
-        'SCORE APC': "{:.2f}",
-        'TOTAL SCORE PPSA': "{:.2f}"
+    # --- PERBAIKAN: MENGGUNAKAN column_config (METODE BARU) ---
+    # Definisikan konfigurasi untuk setiap kolom yang perlu diformat
+    # Format "%.2f %%" berarti: angka dengan 2 desimal, diikuti spasi dan simbol %
+    column_configuration = {
+        'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large", help="Nama dari kasir"),
+        'TANGGAL': st.column_config.DateColumn("Tanggal", format="DD.MM.YYYY", width="medium"),
+        'SHIFT': st.column_config.TextColumn("Shift", width="small"),
+        
+        # Kolom Target & Actual
+        'PSM Target': st.column_config.NumberColumn(format="%.0f"),
+        'PSM Actual': st.column_config.NumberColumn(format="%.0f"),
+        'PWP Target': st.column_config.NumberColumn(format="%.0f"),
+        'PWP Actual': st.column_config.NumberColumn(format="%.0f"),
+        'SG Target': st.column_config.NumberColumn(format="%.0f"),
+        'SG Actual': st.column_config.NumberColumn(format="%.0f"),
+        'APC Target': st.column_config.NumberColumn(format="%.0f"),
+        'APC Actual': st.column_config.NumberColumn(format="%.0f"),
+        'TARGET TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
+        'ACTUAL TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
+
+        # Kolom Persentase ACV
+        '(%) PSM ACV': st.column_config.NumberColumn("ACV PSM (%)", format="%.2f %%", help="Persentase Pencapaian PSM"),
+        '(%) PWP ACV': st.column_config.NumberColumn("ACV PWP (%)", format="%.2f %%", help="Persentase Pencapaian PWP"),
+        '(%) SG ACV': st.column_config.NumberColumn("ACV SG (%)", format="%.2f %%", help="Persentase Pencapaian SG"),
+        '(%) APC ACV': st.column_config.NumberColumn("ACV APC (%)", format="%.2f %%", help="Persentase Pencapaian APC"),
+        '(%) ACV TEBUS 2500': st.column_config.NumberColumn("ACV Tebus 2500 (%)", format="%.2f %%", help="Persentase Pencapaian Tebus 2500"),
+
+        # Kolom Bobot
+        'BOBOT PSM': st.column_config.NumberColumn(format="%.0f"),
+        'BOBOT PWP': st.column_config.NumberColumn(format="%.0f"),
+        'BOBOT SG': st.column_config.NumberColumn(format="%.0f"),
+        'BOBOT APC': st.column_config.NumberColumn(format="%.0f"),
+        
+        # Kolom Score
+        'SCORE PSM': st.column_config.NumberColumn("Score PSM", format="%.2f"),
+        'SCORE PWP': st.column_config.NumberColumn("Score PWP", format="%.2f"),
+        'SCORE SG': st.column_config.NumberColumn("Score SG", format="%.2f"),
+        'SCORE APC': st.column_config.NumberColumn("Score APC", format="%.2f"),
+        'TOTAL SCORE PPSA': st.column_config.NumberColumn("TOTAL SCORE PPSA", format="%.2f", help="Total akhir score PPSA"),
     }
     
-    # Buat dictionary format hanya untuk kolom yang ADA di filtered_df
-    # Ini mencegah TypeError jika suatu kolom tidak ada
-    format_dict = {col: fmt for col, fmt in potential_formats.items() if col in filtered_df.columns}
+    # Buat dictionary konfigurasi final hanya untuk kolom yang ada di dataframe
+    final_column_config = {col: config for col, config in column_configuration.items() if col in filtered_df.columns}
     
-    # Tampilkan dataframe dengan format yang aman
-    st.dataframe(filtered_df, use_container_width=True, format=format_dict)
+    # Tampilkan dataframe dengan konfigurasi baru
+    st.dataframe(
+        filtered_df,
+        use_container_width=True,
+        column_config=final_column_config,
+        hide_index=True # Sembunyikan index pandas
+    )
