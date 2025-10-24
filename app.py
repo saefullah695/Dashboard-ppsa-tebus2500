@@ -9,10 +9,23 @@ from datetime import datetime
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
     page_title="Dashboard PPSA Analytics",
-    page_icon="📊",
+    page_icon="📊", # Favicon browser, bisa diganti nanti
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- FUNGSI HELPER UNTUK SVG ICON ---
+def get_svg_icon(icon_name, size=24, color="#667eea"):
+    icons = {
+        "dashboard": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h2v8H3zm4-8h2v16H7zm4-2h2v18h-2zm4 4h2v14h-2zm4-2h2v16h-2z" fill="{color}"/></svg>',
+        "psm": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" fill="{color}"/></svg>',
+        "pwp": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" fill="{color}"/></svg>',
+        "sg": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="{color}"/></svg>',
+        "apc": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" fill="{color}"/></svg>',
+        "tebus": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="{color}"/></svg>',
+        "trophy": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" fill="{color}"/></svg>'
+    }
+    return icons.get(icon_name, "")
 
 # --- CSS KUSTOM UNTUK TAMPILAN MODERN ---
 st.markdown("""
@@ -44,6 +57,7 @@ st.markdown("""
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
     margin-bottom: 2rem;
     border: 1px solid rgba(255, 255, 255, 0.3);
+    text-align: center;
 }
 
 .main-title {
@@ -53,9 +67,12 @@ st.markdown("""
     -webkit-text-fill-color: transparent;
     background-clip: text;
     font-weight: 800;
-    text-align: center;
     margin-bottom: 0.5rem;
     letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
 }
 
 .subtitle {
@@ -78,6 +95,7 @@ st.markdown("""
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    height: 100%;
 }
 
 .metric-card::before {
@@ -102,6 +120,9 @@ st.markdown("""
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .metric-value {
@@ -346,7 +367,7 @@ def process_data(df):
 # --- FUNGSI UNTUK MENGHITUNG TOTAL PPSA KESELURUHAN ---
 def calculate_overall_ppsa_breakdown(df):
     if df.empty:
-        return {'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
+        return {'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0, 'tebus_murah': 0.0}
     
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     scores = {'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
@@ -367,6 +388,13 @@ def calculate_overall_ppsa_breakdown(df):
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
         scores['apc'] = (acv_apc * weights['APC']) / 100
     
+    # --- TAMBAHAN: HITUNG ACV UNTUK TEBUS MURAH ---
+    total_target_tebus = df['TARGET TEBUS 2500'].sum()
+    total_actual_tebus = df['ACTUAL TEBUS 2500'].sum()
+    if total_target_tebus > 0:
+        acv_tebus = (total_actual_tebus / total_target_tebus) * 100
+        scores['tebus_murah'] = acv_tebus # Simpan sebagai ACV, bukan skor
+
     scores['total'] = sum(scores.values())
     return scores
 
@@ -377,61 +405,57 @@ def calculate_aggregate_scores_per_cashier(df):
 
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     
-    # Daftar kolom yang akan diagregasi
     agg_cols = {
         'PSM Target': 'sum', 'PSM Actual': 'sum',
         'PWP Target': 'sum', 'PWP Actual': 'sum',
         'SG Target': 'sum', 'SG Actual': 'sum',
-        'APC Target': 'mean', 'APC Actual': 'mean' # APC tetap pakai rata-rata
+        'APC Target': 'mean', 'APC Actual': 'mean',
+        # --- TAMBAHAN: AGREGASI UNTUK TEBUS MURAH ---
+        'TARGET TEBUS 2500': 'sum', 'ACTUAL TEBUS 2500': 'sum'
     }
     
-    # Lakukan agregasi per kasir
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
-    
-    # --- PERBAIKAN: KONVERSI KE LIST UNTUK MENGHINDARI ERROR ---
     aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
 
-    # Fungsi untuk menghitung skor dari data agregat
     def calculate_score_from_agg(row, comp):
         target_col = f'{comp} Target'
         actual_col = f'{comp} Actual'
-        
-        if target_col not in row or actual_col not in row:
-            return 0.0
-            
+        if target_col not in row or actual_col not in row: return 0.0
         total_target = row[target_col]
         total_actual = row[actual_col]
-        
-        if total_target == 0:
-            return 0.0
-        
+        if total_target == 0: return 0.0
         acv = (total_actual / total_target) * 100
         score = (acv * weights[comp]) / 100
         return score
 
-    # Hitung skor untuk setiap komponen
     for comp in ['PSM', 'PWP', 'SG', 'APC']:
         aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
 
-    # Hitung total skor PPSA
+    # --- TAMBAHAN: HITUNG ACV TEBUS MURAH PER KASIR ---
+    def calculate_acv_tebus(row):
+        if row['TARGET TEBUS 2500'] == 0: return 0.0
+        return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
+    aggregated_df['(%) ACV TEBUS 2500'] = aggregated_df.apply(calculate_acv_tebus, axis=1)
+
     score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
     
-    # Urutkan dari skor tertinggi ke terendah
     aggregated_df = aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
-    
     return aggregated_df
 
 
 # --- UI DASHBOARD ---
-# Header Dashboard
-st.markdown("""
+# Header Dashboard dengan Icon Baru
+st.markdown(f"""
 <div class="dashboard-header">
-    <h1 class="main-title">📊 Dashboard PPSA Analytics</h1>
+    <h1 class="main-title">
+        {get_svg_icon("dashboard", size=48, color="#667eea")}
+        Dashboard PPSA Analytics
+    </h1>
     <p class="subtitle">
         Platform pemantauan performa komprehensif untuk indikator <strong>PPSA</strong> yang mencakup 
         <strong>PSM</strong> (Produk Spesial Mingguan), <strong>PWP</strong> (Purchase With Purchase), 
-        <strong>SG</strong> (Serba Gratis), dan <strong>APC</strong> (Average Purchase Customer)
+        <strong>SG</strong> (Serba Gratis), <strong>APC</strong> (Average Purchase Customer), dan <strong>Tebus Murah</strong>.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -442,7 +466,6 @@ raw_df = load_data_from_gsheet()
 if not raw_df.empty:
     processed_df = process_data(raw_df.copy())
     
-    # --- SIDEBAR FILTERS ---
     with st.sidebar:
         st.markdown("### ⚙️ Pengaturan Filter")
         st.markdown("---")
@@ -481,7 +504,6 @@ if not raw_df.empty:
                     filtered_df = filtered_df.loc[mask]
         
         st.markdown("---")
-        
         st.markdown("**📊 Ringkasan Data**")
         st.info(f"**Total Record:** {len(filtered_df)}\n\n**Kasir Terpilih:** {len(selected_names) if 'selected_names' in locals() else 0}")
 
@@ -491,20 +513,22 @@ if not raw_df.empty:
     
     overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    col1, col2, col3, col4 = st.columns(4, gap="medium")
+    # --- PERBAIKAN: LAYOUT 5 KOLOM ---
+    col1, col2, col3, col4, col5 = st.columns(5, gap="small")
     
     metrics = [
-        {"label": "PSM Score", "value": overall_scores['psm'], "icon": "📦", "col": col1},
-        {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "🛍️", "col": col2},
-        {"label": "SG Score", "value": overall_scores['sg'], "icon": "🎁", "col": col3},
-        {"label": "APC Score", "value": overall_scores['apc'], "icon": "💳", "col": col4}
+        {"label": "PSM Score", "value": overall_scores['psm'], "icon": "psm", "col": col1},
+        {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "pwp", "col": col2},
+        {"label": "SG Score", "value": overall_scores['sg'], "icon": "sg", "col": col3},
+        {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4},
+        {"label": "Tebus Murah ACV", "value": overall_scores['tebus_murah'], "icon": "tebus", "col": col5}
     ]
     
     for metric in metrics:
         with metric["col"]:
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-label">{metric['icon']} {metric['label']}</div>
+                <div class="metric-label">{get_svg_icon(metric['icon'], size=20)} {metric['label']}</div>
                 <div class="metric-value">{metric['value']:.2f}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -516,7 +540,7 @@ if not raw_df.empty:
     with col_total:
         st.markdown(f"""
         <div class="total-ppsa-card">
-            <div class="total-ppsa-label">💰 Total PPSA Score</div>
+            <div class="total-ppsa-label">{get_svg_icon("trophy", size=32, color="white")} TOTAL PPSA SCORE</div>
             <div class="total-ppsa-value">{overall_scores['total']:.2f}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -529,58 +553,9 @@ if not raw_df.empty:
         })
         
         fig_overall = go.Figure()
-        
-        fig_overall.add_trace(go.Bar(
-            name='Score Aktual',
-            x=chart_data['Komponen'],
-            y=chart_data['Skor'],
-            marker=dict(
-                color=['#667eea', '#764ba2', '#f093fb', '#4facfe'],
-                line=dict(color='rgba(255, 255, 255, 0.5)', width=2)
-            ),
-            text=chart_data['Skor'].round(2),
-            textposition='outside',
-            textfont=dict(size=12, color='#1e293b', weight='bold')
-        ))
-        
-        fig_overall.add_trace(go.Scatter(
-            name='Target',
-            x=chart_data['Komponen'],
-            y=chart_data['Target'],
-            mode='markers+lines',
-            marker=dict(size=12, color='#ef4444', symbol='diamond'),
-            line=dict(color='#ef4444', width=2, dash='dash')
-        ))
-        
-        fig_overall.update_layout(
-            template='plotly_white',
-            height=300,
-            margin=dict(l=20, r=20, t=40, b=20),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font=dict(size=11)
-            ),
-            xaxis=dict(
-                showgrid=False,
-                showline=True,
-                linecolor='rgba(0,0,0,0.1)',
-                title=None
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor='rgba(0,0,0,0.05)',
-                showline=False,
-                title='Skor'
-            )
-        )
-        
+        fig_overall.add_trace(go.Bar(name='Score Aktual', x=chart_data['Komponen'], y=chart_data['Skor'], marker=dict(color=['#667eea', '#764ba2', '#f093fb', '#4facfe'], line=dict(color='rgba(255, 255, 255, 0.5)', width=2)), text=chart_data['Skor'].round(2), textposition='outside', textfont=dict(size=12, color='#1e293b', weight='bold')))
+        fig_overall.add_trace(go.Scatter(name='Target', x=chart_data['Komponen'], y=chart_data['Target'], mode='markers+lines', marker=dict(size=12, color='#ef4444', symbol='diamond'), line=dict(color='#ef4444', width=2, dash='dash')))
+        fig_overall.update_layout(template='plotly_white', height=300, margin=dict(l=20, r=20, t=40, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)), xaxis=dict(showgrid=False, showline=True, linecolor='rgba(0,0,0,0.1)', title=None), yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='Skor'))
         st.plotly_chart(fig_overall, use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -591,57 +566,17 @@ if not raw_df.empty:
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
         score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
-        
-        # Tambah ranking
         score_summary['Ranking'] = range(1, len(score_summary) + 1)
         
         fig_kasir = go.Figure()
-        
-        colors = ['#667eea' if i < 3 else '#764ba2' if i < 5 else '#a8a8a8' 
-                  for i in range(len(score_summary))]
-        
-        fig_kasir.add_trace(go.Bar(
-            y=score_summary['NAMA KASIR'],
-            x=score_summary['TOTAL SCORE PPSA'],
-            orientation='h',
-            marker=dict(
-                color=colors,
-                line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5)
-            ),
-            text=[f"#{rank} - {score:.2f}" for rank, score in 
-                  zip(score_summary['Ranking'], score_summary['TOTAL SCORE PPSA'])],
-            textposition='outside',
-            textfont=dict(size=11, color='#1e293b', weight='bold')
-        ))
-        
-        fig_kasir.update_layout(
-            template='plotly_white',
-            height=max(400, len(score_summary) * 40),
-            margin=dict(l=20, r=80, t=20, b=20),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            xaxis=dict(
-                showgrid=True,
-                gridcolor='rgba(0,0,0,0.05)',
-                showline=False,
-                title='Total Score PPSA (Agregat)'
-            ),
-            yaxis=dict(
-                showgrid=False,
-                showline=False,
-                categoryorder='total ascending',
-                title=None
-            )
-        )
-        
+        colors = ['#667eea' if i < 3 else '#764ba2' if i < 5 else '#a8a8a8' for i in range(len(score_summary))]
+        fig_kasir.add_trace(go.Bar(y=score_summary['NAMA KASIR'], x=score_summary['TOTAL SCORE PPSA'], orientation='h', marker=dict(color=colors, line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5)), text=[f"#{rank} - {score:.2f}" for rank, score in zip(score_summary['Ranking'], score_summary['TOTAL SCORE PPSA'])], textposition='outside', textfont=dict(size=11, color='#1e293b', weight='bold')))
+        fig_kasir.update_layout(template='plotly_white', height=max(400, len(score_summary) * 40), margin=dict(l=20, r=80, t=20, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='Total Score PPSA (Agregat)'), yaxis=dict(showgrid=False, showline=False, categoryorder='total ascending', title=None))
         st.plotly_chart(fig_kasir, use_container_width=True)
         
-        # Top 3 Performers
         st.markdown("#### 🏅 Top 3 Performers (Berdasarkan Skor Agregat)")
         cols = st.columns(3)
         medals = ["🥇", "🥈", "🥉"]
-        
         for idx, (col, medal) in enumerate(zip(cols, medals)):
             if idx < len(score_summary):
                 with col:
@@ -659,6 +594,24 @@ if not raw_df.empty:
     else:
         st.warning("⚠️ Tidak ada data untuk ditampilkan setelah difilter.")
     
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- TAMBAHAN: SEKSI UNTUK TEBUS MURAH ---
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">🛒 Performa Tebus Murah (Rp 2.500)</h2>', unsafe_allow_html=True)
+    st.caption("Catatan: Indikator ini ditampilkan terpisah dan tidak termasuk dalam perhitungan Total PPSA.")
+    
+    if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
+        tebus_summary = calculate_aggregate_scores_per_cashier(filtered_df)
+        tebus_summary = tebus_summary.sort_values(by='(%) ACV TEBUS 2500', ascending=False).reset_index(drop=True)
+        tebus_summary['Ranking'] = range(1, len(tebus_summary) + 1)
+
+        fig_tebus = go.Figure()
+        colors = ['#10b981' if i < 3 else '#34d399' if i < 5 else '#a8a8a8' for i in range(len(tebus_summary))]
+        fig_tebus.add_trace(go.Bar(y=tebus_summary['NAMA KASIR'], x=tebus_summary['(%) ACV TEBUS 2500'], orientation='h', marker=dict(color=colors, line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5)), text=[f"#{rank} - {score:.2f}%" for rank, score in zip(tebus_summary['Ranking'], tebus_summary['(%) ACV TEBUS 2500'])], textposition='outside', textfont=dict(size=11, color='#1e293b', weight='bold')))
+        fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), margin=dict(l=20, r=80, t=20, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='ACV Tebus Murah (%)'), yaxis=dict(showgrid=False, showline=False, categoryorder='total ascending', title=None))
+        st.plotly_chart(fig_tebus, use_container_width=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- TABEL DETAIL ---
@@ -697,21 +650,10 @@ if not raw_df.empty:
     
     final_column_config = {col: config for col, config in column_configuration.items() if col in filtered_df.columns}
     
-    st.dataframe(
-        filtered_df,
-        use_container_width=True,
-        column_config=final_column_config,
-        hide_index=True,
-        height=500
-    )
+    st.dataframe(filtered_df, use_container_width=True, column_config=final_column_config, hide_index=True, height=500)
     
     csv = filtered_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Data (CSV)",
-        data=csv,
-        file_name=f"ppsa_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv",
-    )
+    st.download_button(label="📥 Download Data (CSV)", data=csv, file_name=f"ppsa_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -719,8 +661,8 @@ else:
     st.error("❌ Tidak dapat memuat data. Silakan periksa koneksi Google Sheets Anda.")
 
 st.markdown("<br><br>", unsafe_allow_html=True)
-st.markdown("""
+st.markdown(f"""
 <div style='text-align: center; color: rgba(255,255,255,0.7); padding: 2rem; font-size: 0.9rem;'>
-    <strong>Dashboard PPSA Analytics</strong> • Powered by Streamlit • © 2025
+    <strong>Dashboard PPSA Analytics</strong> • {get_svg_icon("dashboard", size=16, color="rgba(255,255,255,0.7)")} Powered by Streamlit • © 2025
 </div>
 """, unsafe_allow_html=True)
