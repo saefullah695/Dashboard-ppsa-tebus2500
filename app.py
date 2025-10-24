@@ -37,7 +37,7 @@ def load_data_from_gsheet():
         st.error(f"Gagal mengambil data dari Google Sheets: {e}")
         return pd.DataFrame()
 
-# --- FUNGSI UNTUK MEMPROSES DATA DAN MENGHITUNG SCORE ---
+# --- FUNGSI UNTUK MEMPROSES DATA PER KASIR ---
 def process_data(df):
     if df.empty:
         return df
@@ -75,6 +75,41 @@ def process_data(df):
     df['TOTAL SCORE PPSA'] = df[score_cols].sum(axis=1)
     
     return df
+
+# --- FUNGSI BARU: UNTUK MENGHITUNG TOTAL PPSA KESELURUHAN ---
+def calculate_overall_ppsa_score(df):
+    """
+    Menghitung total PPSA dari keseluruhan data yang difilter.
+    """
+    if df.empty:
+        return 0.0
+
+    # Bobot Default
+    weights = {
+        'PSM': 20,
+        'PWP': 25,
+        'SG': 30,
+        'APC': 25
+    }
+    
+    total_score = 0.0
+
+    # --- Perhitungan untuk setiap komponen ---
+    components = ['PSM', 'PWP', 'SG', 'APC']
+    
+    for comp in components:
+        target_col = f'{comp} Target'
+        actual_col = f'{comp} Actual'
+        
+        total_target = df[target_col].sum()
+        total_actual = df[actual_col].sum()
+        
+        if total_target > 0:
+            acv = (total_actual / total_target) * 100
+            score = (acv * weights[comp]) / 100
+            total_score += score
+            
+    return total_score
 
 # --- UI DASHBOARD ---
 st.title("📊 Dashboard PPSA")
@@ -115,6 +150,20 @@ if not raw_df.empty:
                 mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                 filtered_df = filtered_df.loc[mask]
 
+    # --- TAMBAHAN: TAMPILKAN TOTAL PPSA KESELURUHAN ---
+    st.header("🏆 Ringkasan Performa Keseluruhan")
+    total_score_keseluruhan = calculate_overall_ppsa_score(filtered_df)
+    
+    # Menggunakan st.columns untuk menempatkan metric di tengah
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.metric(
+            label="Total PPSA Keseluruhan",
+            value=f"{total_score_keseluruhan:.2f}",
+            help="Total skor PPSA dihitung dari jumlah seluruh target dan actual pada data yang difilter."
+        )
+    st.divider() # Garis pemisah
+
     st.header("Data Performa Kasir")
     
     st.subheader("Total Score PPSA per Kasir")
@@ -126,15 +175,11 @@ if not raw_df.empty:
 
     st.subheader("Tabel Detail Perhitungan")
     
-    # --- PERBAIKAN: MENGGUNAKAN column_config (METODE BARU) ---
-    # Definisikan konfigurasi untuk setiap kolom yang perlu diformat
-    # Format "%.2f %%" berarti: angka dengan 2 desimal, diikuti spasi dan simbol %
     column_configuration = {
         'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large", help="Nama dari kasir"),
         'TANGGAL': st.column_config.DateColumn("Tanggal", format="DD.MM.YYYY", width="medium"),
         'SHIFT': st.column_config.TextColumn("Shift", width="small"),
         
-        # Kolom Target & Actual
         'PSM Target': st.column_config.NumberColumn(format="%.0f"),
         'PSM Actual': st.column_config.NumberColumn(format="%.0f"),
         'PWP Target': st.column_config.NumberColumn(format="%.0f"),
@@ -146,20 +191,17 @@ if not raw_df.empty:
         'TARGET TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
         'ACTUAL TEBUS 2500': st.column_config.NumberColumn(format="%.0f"),
 
-        # Kolom Persentase ACV
         '(%) PSM ACV': st.column_config.NumberColumn("ACV PSM (%)", format="%.2f %%", help="Persentase Pencapaian PSM"),
         '(%) PWP ACV': st.column_config.NumberColumn("ACV PWP (%)", format="%.2f %%", help="Persentase Pencapaian PWP"),
         '(%) SG ACV': st.column_config.NumberColumn("ACV SG (%)", format="%.2f %%", help="Persentase Pencapaian SG"),
         '(%) APC ACV': st.column_config.NumberColumn("ACV APC (%)", format="%.2f %%", help="Persentase Pencapaian APC"),
         '(%) ACV TEBUS 2500': st.column_config.NumberColumn("ACV Tebus 2500 (%)", format="%.2f %%", help="Persentase Pencapaian Tebus 2500"),
 
-        # Kolom Bobot
         'BOBOT PSM': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT PWP': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT SG': st.column_config.NumberColumn(format="%.0f"),
         'BOBOT APC': st.column_config.NumberColumn(format="%.0f"),
         
-        # Kolom Score
         'SCORE PSM': st.column_config.NumberColumn("Score PSM", format="%.2f"),
         'SCORE PWP': st.column_config.NumberColumn("Score PWP", format="%.2f"),
         'SCORE SG': st.column_config.NumberColumn("Score SG", format="%.2f"),
@@ -167,13 +209,11 @@ if not raw_df.empty:
         'TOTAL SCORE PPSA': st.column_config.NumberColumn("TOTAL SCORE PPSA", format="%.2f", help="Total akhir score PPSA"),
     }
     
-    # Buat dictionary konfigurasi final hanya untuk kolom yang ada di dataframe
     final_column_config = {col: config for col, config in column_configuration.items() if col in filtered_df.columns}
     
-    # Tampilkan dataframe dengan konfigurasi baru
     st.dataframe(
         filtered_df,
         use_container_width=True,
         column_config=final_column_config,
-        hide_index=True # Sembunyikan index pandas
+        hide_index=True
     )
