@@ -1,51 +1,77 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
-# --- Konfigurasi koneksi ke Google Spreadsheet ---
+# --- Konfigurasi koneksi ke Google Sheet (PAKAI cara kamu yang sudah jalan) ---
 scope = ["https://spreadsheets.google.com/feeds",
          "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
+# Gunakan secrets (AMAN di Streamlit Cloud)
+creds_dict = st.secrets["gcp_service_account"]
+creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
-# --- Ambil data dari Sheet ---
+# --- Ambil data dari sheet ---
 sheet = client.open("PesanOtomatis").worksheet("Data")
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
-# --- Hitung skor otomatis berdasarkan ACV dan Bobot ---
+# --- Pastikan nama kolom konsisten (hapus spasi aneh) ---
+df.columns = [c.strip().upper().replace(" ", "_") for c in df.columns]
+
+# --- Hitung skor otomatis ---
 def hitung_score(acv, bobot):
     try:
         return (float(acv) * float(bobot)) / 100
     except:
         return 0
 
-# --- Hitung kolom skor dan total ---
-df["SCORE PSM"] = df.apply(lambda x: hitung_score(x["ACV. 	BOBOT PSM"], 20), axis=1)
-df["SCORE PWP"] = df.apply(lambda x: hitung_score(x["ACV, 	BOBOT PWP"], 25), axis=1)
-df["SCORE SG"] = df.apply(lambda x: hitung_score(x["ACV, 	BOBOT SG"], 30), axis=1)
-df["SCORE APC"] = df.apply(lambda x: hitung_score(x["ACV, 	BOBOT APC"], 25), axis=1)
-df["TOTAL SCORE PPSA"] = df["SCORE PSM"] + df["SCORE PWP"] + df["SCORE SG"] + df["SCORE APC"]
+# Bobot default PPSA
+bobot = {"PSM": 20, "PWP": 25, "SG": 30, "APC": 25}
 
-# --- Tampilan Streamlit ---
+# Hitung score tiap kategori
+for k, v in bobot.items():
+    if f"ACV_{k}" in df.columns:
+        df[f"SCORE_{k}"] = df[f"ACV_{k}"].apply(lambda x: hitung_score(x, v))
+
+# Total Score PPSA
+score_cols = [f"SCORE_{k}" for k in bobot.keys() if f"SCORE_{k}" in df.columns]
+df["TOTAL_SCORE_PPSA"] = df[score_cols].sum(axis=1)
+
+# --- TAMPILAN STREAMLIT ---
 st.set_page_config(page_title="Dashboard PPSA", layout="wide")
-st.title("📊 Dashboard PPSA")
+st.title("📊 Dashboard PPSA - Perhitungan Otomatis")
 
-# Filter by tanggal / kasir
 col1, col2 = st.columns(2)
-tanggal = col1.selectbox("Pilih Tanggal", sorted(df["TANGGAL"].unique()))
-kasir = col2.selectbox("Pilih Nama Kasir", ["Semua"] + sorted(df["NAMA KASIR"].unique()))
+tanggal_list = sorted(df["TANGGAL"].unique())
+kasir_list = ["Semua"] + sorted(df["NAMA_KASIR"].unique())
 
-filtered_df = df[df["TANGGAL"] == tanggal]
+tgl = col1.selectbox("Pilih Tanggal", tanggal_list)
+kasir = col2.selectbox("Pilih Nama Kasir", kasir_list)
+
+filtered = df[df["TANGGAL"] == tgl]
 if kasir != "Semua":
-    filtered_df = filtered_df[filtered_df["NAMA KASIR"] == kasir]
+    filtered = filtered[filtered["NAMA_KASIR"] == kasir]
 
-st.dataframe(filtered_df, use_container_width=True)
+# --- Ringkasan Skor ---
+avg_total = filtered["TOTAL_SCORE_PPSA"].mean() if not filtered.empty else 0
+st.metric("📈 Rata-rata Total Score PPSA", f"{avg_total:.2f}")
 
-# --- Statistik Ringkas ---
-avg_score = filtered_df["TOTAL SCORE PPSA"].mean()
-st.metric("Rata-rata Total Score PPSA", f"{avg_score:.2f}")
+# --- Tabel hasil ---
+st.dataframe(filtered, use_container_width=True)
 
-# --- Grafik Sederhana ---
-st.bar_chart(filtered_df.set_index("NAMA KASIR")["TOTAL SCORE PPSA"])
+# --- Grafik performa ---
+if not filtered.empty:
+    fig = px.bar(
+        filtered,
+        x="NAMA_KASIR",
+        y="TOTAL_SCORE_PPSA",
+        color="TOTAL_SCORE_PPSA",
+        title="Performa Total Score PPSA per Kasir",
+        text_auto=".2f",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("⚠️ Tidak ada data untuk filter yang dipilih.")
