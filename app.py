@@ -394,10 +394,10 @@ def calculate_overall_ppsa_breakdown(df):
         acv_tebus = (total_actual_tebus / total_target_tebus) * 100
         scores['tebus_murah'] = acv_tebus
 
-    scores['total'] = sum([scores['psm'], scores['pwp'], scores['sg'], scores['apc']]) # Total PPSA tidak termasuk tebus
+    scores['total'] = sum([scores['psm'], scores['pwp'], scores['sg'], scores['apc']])
     return scores
 
-# --- FUNGSI BARU: MENGHITUNG SKOR AGREGAT PER KASIR ---
+# --- FUNGSI UNTUK MENGHITUNG SKOR AGREGAT PER KASIR ---
 def calculate_aggregate_scores_per_cashier(df):
     if df.empty or 'NAMA KASIR' not in df.columns:
         return pd.DataFrame()
@@ -433,6 +433,43 @@ def calculate_aggregate_scores_per_cashier(df):
         if row['TARGET TEBUS 2500'] == 0: return 0.0
         return (row['ACTUAL TEBUS 2500'] / row['TARGET TEBUS 2500']) * 100
     aggregated_df['(%) ACV TEBUS 2500'] = aggregated_df.apply(calculate_acv_tebus, axis=1)
+
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
+    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    
+    aggregated_df = aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
+    return aggregated_df
+
+# --- FUNGSI BARU: UNTUK MENGHITUNG SKOR AGREGAT PER SHIFT ---
+def calculate_aggregate_scores_per_shift(df):
+    if df.empty or 'SHIFT' not in df.columns:
+        return pd.DataFrame()
+
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    
+    agg_cols = {
+        'PSM Target': 'sum', 'PSM Actual': 'sum',
+        'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum',
+        'APC Target': 'mean', 'APC Actual': 'mean'
+    }
+    
+    valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
+    aggregated_df = df.groupby('SHIFT')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
+
+    def calculate_score_from_agg(row, comp):
+        target_col = f'{comp} Target'
+        actual_col = f'{comp} Actual'
+        if target_col not in row or actual_col not in row: return 0.0
+        total_target = row[target_col]
+        total_actual = row[actual_col]
+        if total_target == 0: return 0.0
+        acv = (total_actual / total_target) * 100
+        score = (acv * weights[comp]) / 100
+        return score
+
+    for comp in ['PSM', 'PWP', 'SG', 'APC']:
+        aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
 
     score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
     aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
@@ -509,21 +546,23 @@ if not raw_df.empty:
     
     col1, col2, col3, col4, col5 = st.columns(5, gap="small")
     
+    # --- PERBAIKAN 1: TAMBAHKAN FLAG UNTUK FORMAT PERSEN ---
     metrics = [
-        {"label": "PSM Score", "value": overall_scores['psm'], "icon": "psm", "col": col1},
-        {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "pwp", "col": col2},
-        {"label": "SG Score", "value": overall_scores['sg'], "icon": "sg", "col": col3},
-        {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4},
-        # --- PERBAIKAN 1: GANTI JUDUL METRIK ---
-        {"label": "Tebus (Suuegerr) ACV", "value": overall_scores['tebus_murah'], "icon": "tebus", "col": col5}
+        {"label": "PSM Score", "value": overall_scores['psm'], "icon": "psm", "col": col1, "is_percentage": False},
+        {"label": "PWP Score", "value": overall_scores['pwp'], "icon": "pwp", "col": col2, "is_percentage": False},
+        {"label": "SG Score", "value": overall_scores['sg'], "icon": "sg", "col": col3, "is_percentage": False},
+        {"label": "APC Score", "value": overall_scores['apc'], "icon": "apc", "col": col4, "is_percentage": False},
+        {"label": "Tebus (Suuegerr) ACV", "value": overall_scores['tebus_murah'], "icon": "tebus", "col": col5, "is_percentage": True}
     ]
     
     for metric in metrics:
         with metric["col"]:
+            # --- PERBAIKAN 1: FORMAT NILAI BERDASARKAN FLAG ---
+            value_str = f"{metric['value']:.2f}%" if metric.get('is_percentage', False) else f"{metric['value']:.2f}"
             st.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">{get_svg_icon(metric['icon'], size=20)} {metric['label']}</div>
-                <div class="metric-value">{metric['value']:.2f}</div>
+                <div class="metric-value">{value_str}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -589,11 +628,41 @@ if not raw_df.empty:
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- SEKSI UNTUK TEBUS (SUUEGERR) ---
+    # --- TAMBAHAN: SEKSI PERFORMA PER SHIFT ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    # --- PERBAIKAN 1: GANTI JUDUL SEKSI ---
+    st.markdown('<h2 class="section-header">🕒 Performa per Shift</h2>', unsafe_allow_html=True)
+    
+    if not filtered_df.empty and 'SHIFT' in filtered_df.columns:
+        shift_summary = calculate_aggregate_scores_per_shift(filtered_df)
+        if not shift_summary.empty:
+            fig_shift = px.bar(
+                shift_summary,
+                x='TOTAL SCORE PPSA',
+                y='SHIFT',
+                orientation='h',
+                color='TOTAL SCORE PPSA',
+                color_continuous_scale=px.colors.sequential.Blues,
+                template='plotly_white',
+                labels={'TOTAL SCORE PPSA': 'Total Skor PPSA', 'SHIFT': 'Shift'}
+            )
+            fig_shift.update_layout(
+                height=300,
+                margin=dict(l=20, r=20, t=20, b=20),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                showlegend=False,
+                yaxis={'categoryorder': 'total ascending'}
+            )
+            st.plotly_chart(fig_shift, use_container_width=True)
+        else:
+            st.warning("⚠️ Tidak dapat menghitung performa per shift. Pastikan data shift dan target/actual tidak kosong.")
+    else:
+        st.info("ℹ️ Data 'SHIFT' tidak ditemukan untuk ditampilkan.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
     st.markdown('<h2 class="section-header">🛒 Performa Tebus (Suuegerr)</h2>', unsafe_allow_html=True)
-    # --- PERBAIKAN 1: GANTI TEKS CAPTION ---
     st.caption("Catatan: Indikator 'Tebus (Suuegerr)' ditampilkan terpisah dan tidak termasuk dalam perhitungan Total PPSA.")
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
@@ -604,11 +673,9 @@ if not raw_df.empty:
         fig_tebus = go.Figure()
         colors = ['#10b981' if i < 3 else '#34d399' if i < 5 else '#a8a8a8' for i in range(len(tebus_summary))]
         fig_tebus.add_trace(go.Bar(y=tebus_summary['NAMA KASIR'], x=tebus_summary['(%) ACV TEBUS 2500'], orientation='h', marker=dict(color=colors, line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5)), text=[f"#{rank} - {score:.2f}%" for rank, score in zip(tebus_summary['Ranking'], tebus_summary['(%) ACV TEBUS 2500'])], textposition='outside', textfont=dict(size=11, color='#1e293b', weight='bold')))
-        # --- PERBAIKAN 1: GANTI JUDUL SUMBU X ---
         fig_tebus.update_layout(template='plotly_white', height=max(400, len(tebus_summary) * 40), margin=dict(l=20, r=80, t=20, b=20), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', showline=False, title='ACV Tebus (Suuegerr) (%)'), yaxis=dict(showgrid=False, showline=False, categoryorder='total ascending', title=None))
         st.plotly_chart(fig_tebus, use_container_width=True)
 
-        # --- PERBAIKAN 2: TAMBAHKAN TOP 3 PERFORMERS UNTUK TEBUS ---
         st.markdown("#### 🛒 Top 3 Performers (Tebus Suuegerr)")
         cols = st.columns(3)
         medals = ["🥇", "🥈", "🥉"]
