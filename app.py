@@ -4,7 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -566,10 +566,12 @@ if not raw_df.empty:
 
     # --- DATA PERFORMA KASIR ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    st.markdown('<h2 class="section-header">📈 Performa Individual Kasir</h2>', unsafe_allow_html=True)
+    # --- PERBAIKAN: UBAH JUDUL MENJADI RATA-RATA ---
+    st.markdown('<h2 class="section-header">📈 Rata-Rata Performa Kasir</h2>', unsafe_allow_html=True)
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].sum().sort_values(ascending=False).reset_index()
+        # --- PERBAIKAN UTAMA: UBAH .sum() MENJADI .mean() ---
+        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().sort_values(ascending=False).reset_index()
         
         # Tambah ranking
         score_summary['Ranking'] = range(1, len(score_summary) + 1)
@@ -601,11 +603,12 @@ if not raw_df.empty:
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
             showlegend=False,
+            # --- PERBAIKAN: UBAH JUDUL SUMBU X ---
             xaxis=dict(
                 showgrid=True,
                 gridcolor='rgba(0,0,0,0.05)',
                 showline=False,
-                title='Total Score PPSA'
+                title='Rata-Rata Score PPSA'
             ),
             yaxis=dict(
                 showgrid=False,
@@ -618,7 +621,7 @@ if not raw_df.empty:
         st.plotly_chart(fig_kasir, use_container_width=True)
         
         # Top 3 Performers
-        st.markdown("#### 🏅 Top 3 Performers")
+        st.markdown("#### 🏅 Top 3 Performers (Berdasarkan Rata-Rata)")
         cols = st.columns(3)
         medals = ["🥇", "🥈", "🥉"]
         
