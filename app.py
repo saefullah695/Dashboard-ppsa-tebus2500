@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Dashboard PPSA",
+    page_title="Dashboard PPSA (PSM, PWP, SG, APC)",
     page_icon="📊",
     layout="wide"
 )
@@ -76,12 +76,8 @@ def process_data(df):
     
     return df
 
-# --- FUNGSI YANG DIPERBAIKI: MENGEMBALIKAN DETAIL SKOR SETIAP KOMPONEN ---
+# --- FUNGSI UNTUK MENGHITUNG TOTAL PPSA KESELURUHAN ---
 def calculate_overall_ppsa_breakdown(df):
-    """
-    Menghitung total PPSA keseluruhan dan mengembalikan skor per komponen.
-    Logika: PSM/PWP/SG (dari total), APC (dari rata-rata).
-    """
     if df.empty:
         return {
             'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0
@@ -90,7 +86,6 @@ def calculate_overall_ppsa_breakdown(df):
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     scores = {'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
 
-    # Komponen PSM, PWP, SG (berdasarkan JUMLAH/SUM)
     sum_components = ['PSM', 'PWP', 'SG']
     for comp in sum_components:
         target_col = f'{comp} Target'
@@ -102,7 +97,6 @@ def calculate_overall_ppsa_breakdown(df):
             acv = (total_actual / total_target) * 100
             scores[comp.lower()] = (acv * weights[comp]) / 100
 
-    # Komponen APC (berdasarkan RATA-RATA/MEAN)
     avg_target_apc = df['APC Target'].mean()
     avg_actual_apc = df['APC Actual'].mean()
     
@@ -114,8 +108,15 @@ def calculate_overall_ppsa_breakdown(df):
     return scores
 
 # --- UI DASHBOARD ---
-st.title("📊 Dashboard Performa PPSA")
-st.markdown("Dashboard untuk memantau performa **Penjualan Prestasi Sales Assistant (PPSA)** yang terdiri dari komponen **PSM, PWP, SG, dan APC**.")
+# --- PERBAIKAN 1: JUDUL DAN DESKRIPSI YANG BENAR ---
+st.title("📊 Dashboard PPSA")
+st.markdown("""
+Dashboard untuk memantau performa indikator **PPSA** yang terdiri dari:
+- **P**SM (Product Sales per Minute)
+- **P**WP (Product per Working hour)
+- **S**G (Sales Growth)
+- **A**PC (Average Purchase per Customer)
+""")
 
 raw_df = load_data_from_gsheet()
 
@@ -152,11 +153,9 @@ if not raw_df.empty:
                 mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                 filtered_df = filtered_df.loc[mask]
 
-    # --- PENINGKATAN: TAMPILKAN RINGKASAN DENGAN METRIK TERPERINCI ---
     st.header("🏆 Ringkasan Performa Keseluruhan")
     overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    # Tampilkan skor per komponen
     col_psm, col_pwp, col_sg, col_apc = st.columns(4)
     with col_psm:
         st.metric("Skor PSM", f"{overall_scores['psm']:.2f}", help="Skor dari total PSM")
@@ -167,9 +166,8 @@ if not raw_df.empty:
     with col_apc:
         st.metric("Skor APC", f"{overall_scores['apc']:.2f}", help="Skor dari rata-rata APC")
     
-    st.markdown("---") # Garis pemisah
+    st.markdown("---")
     
-    # Tampilkan total skor dan grafik kontribusi
     col_total, col_chart = st.columns([1, 2])
     with col_total:
         st.metric(
@@ -178,7 +176,6 @@ if not raw_df.empty:
             help="Total skor adalah jumlah dari Skor PSM, PWP, SG, dan APC."
         )
     with col_chart:
-        # Data untuk grafik
         chart_data = {
             'Komponen': ['PSM', 'PWP', 'SG', 'APC'],
             'Skor': [overall_scores['psm'], overall_scores['pwp'], overall_scores['sg'], overall_scores['apc']]
@@ -190,9 +187,11 @@ if not raw_df.empty:
 
     st.header("Data Performa Kasir")
     
-    st.subheader("Rata-rata Score PPSA per Kasir")
+    # --- PERBAIKAN 2: GRAFIK TOTAL SCORE PER KASIR ---
+    st.subheader("Total Score PPSA per Kasir")
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().sort_values(ascending=False)
+        # Menggunakan .sum() untuk menjumlahkan total skor per kasir
+        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].sum().sort_values(ascending=False)
         st.bar_chart(score_summary)
     else:
         st.warning("Tidak ada data untuk ditampilkan setelah difilter.")
