@@ -267,32 +267,6 @@ st.markdown("""
     animation: fadeIn 0.6s ease-out;
 }
 
-/* Badge */
-.status-badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.badge-success {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-}
-
-.badge-warning {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-}
-
-.badge-danger {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-}
-
 /* Hide Streamlit Branding */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
@@ -396,6 +370,56 @@ def calculate_overall_ppsa_breakdown(df):
     scores['total'] = sum(scores.values())
     return scores
 
+# --- FUNGSI BARU: MENGHITUNG SKOR AGREGAT PER KASIR ---
+def calculate_aggregate_scores_per_cashier(df):
+    if df.empty or 'NAMA KASIR' not in df.columns:
+        return pd.DataFrame()
+
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    
+    # Daftar kolom yang akan diagregasi
+    agg_cols = {
+        'PSM Target': 'sum', 'PSM Actual': 'sum',
+        'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum',
+        'APC Target': 'mean', 'APC Actual': 'mean' # APC tetap pakai rata-rata
+    }
+    
+    # Lakukan agregasi per kasir
+    valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
+    aggregated_df = df.groupby('NAMA KASIR')[valid_agg_cols.keys()].agg(valid_agg_cols).reset_index()
+
+    # Fungsi untuk menghitung skor dari data agregat
+    def calculate_score_from_agg(row, comp):
+        target_col = f'{comp} Target'
+        actual_col = f'{comp} Actual'
+        
+        if target_col not in row or actual_col not in row:
+            return 0.0
+            
+        total_target = row[target_col]
+        total_actual = row[actual_col]
+        
+        if total_target == 0:
+            return 0.0
+        
+        acv = (total_actual / total_target) * 100
+        score = (acv * weights[comp]) / 100
+        return score
+
+    # Hitung skor untuk setiap komponen
+    for comp in ['PSM', 'PWP', 'SG', 'APC']:
+        aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(lambda row: calculate_score_from_agg(row, comp), axis=1)
+
+    # Hitung total skor PPSA
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
+    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    
+    # Urutkan dari skor tertinggi ke terendah
+    aggregated_df = aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
+    
+    return aggregated_df
+
 
 # --- UI DASHBOARD ---
 # Header Dashboard
@@ -421,7 +445,6 @@ if not raw_df.empty:
         st.markdown("### ⚙️ Pengaturan Filter")
         st.markdown("---")
         
-        # Filter Kasir
         if 'NAMA KASIR' in processed_df.columns:
             st.markdown("**👤 Pilih Kasir**")
             selected_names = st.multiselect(
@@ -436,7 +459,6 @@ if not raw_df.empty:
 
         st.markdown("---")
         
-        # Filter Tanggal
         if 'TANGGAL' in filtered_df.columns:
             filtered_df = filtered_df.dropna(subset=['TANGGAL'])
             if not filtered_df.empty:
@@ -458,7 +480,6 @@ if not raw_df.empty:
         
         st.markdown("---")
         
-        # Info Summary
         st.markdown("**📊 Ringkasan Data**")
         st.info(f"**Total Record:** {len(filtered_df)}\n\n**Kasir Terpilih:** {len(selected_names) if 'selected_names' in locals() else 0}")
 
@@ -468,7 +489,6 @@ if not raw_df.empty:
     
     overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
     
-    # Metric Cards
     col1, col2, col3, col4 = st.columns(4, gap="medium")
     
     metrics = [
@@ -489,7 +509,6 @@ if not raw_df.empty:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Total PPSA dengan Chart
     col_total, col_chart = st.columns([1, 2], gap="large")
     
     with col_total:
@@ -566,19 +585,18 @@ if not raw_df.empty:
 
     # --- DATA PERFORMA KASIR ---
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    # --- PERBAIKAN: UBAH JUDUL MENJADI RATA-RATA ---
-    st.markdown('<h2 class="section-header">📈 Rata-Rata Performa Kasir</h2>', unsafe_allow_html=True)
+    # --- PERBAIKAN: UBAH JUDUL MENJADI PERFORMA AGREGAT ---
+    st.markdown('<h2 class="section-header">📈 Total Performa Kasir (Agregat)</h2>', unsafe_allow_html=True)
     
     if not filtered_df.empty and 'NAMA KASIR' in filtered_df.columns:
-        # --- PERBAIKAN UTAMA: UBAH .sum() MENJADI .mean() ---
-        score_summary = filtered_df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].mean().sort_values(ascending=False).reset_index()
+        # --- PERBAIKAN UTAMA: GUNAKAN FUNGSI BARU UNTUK MENGHITUNG SKOR AGREGAT ---
+        score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
         
         # Tambah ranking
         score_summary['Ranking'] = range(1, len(score_summary) + 1)
         
         fig_kasir = go.Figure()
         
-        # Warna gradient berdasarkan ranking
         colors = ['#667eea' if i < 3 else '#764ba2' if i < 5 else '#a8a8a8' 
                   for i in range(len(score_summary))]
         
@@ -608,7 +626,7 @@ if not raw_df.empty:
                 showgrid=True,
                 gridcolor='rgba(0,0,0,0.05)',
                 showline=False,
-                title='Rata-Rata Score PPSA'
+                title='Total Score PPSA (Agregat)'
             ),
             yaxis=dict(
                 showgrid=False,
@@ -621,7 +639,7 @@ if not raw_df.empty:
         st.plotly_chart(fig_kasir, use_container_width=True)
         
         # Top 3 Performers
-        st.markdown("#### 🏅 Top 3 Performers (Berdasarkan Rata-Rata)")
+        st.markdown("#### 🏅 Top 3 Performers (Berdasarkan Skor Agregat)")
         cols = st.columns(3)
         medals = ["🥇", "🥈", "🥉"]
         
@@ -688,7 +706,6 @@ if not raw_df.empty:
         height=500
     )
     
-    # Download Button
     csv = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Download Data (CSV)",
@@ -702,7 +719,6 @@ if not raw_df.empty:
 else:
     st.error("❌ Tidak dapat memuat data. Silakan periksa koneksi Google Sheets Anda.")
 
-# Footer
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("""
 <div style='text-align: center; color: rgba(255,255,255,0.7); padding: 2rem; font-size: 0.9rem;'>
