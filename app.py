@@ -565,7 +565,7 @@ def calculate_overall_ppsa_breakdown(df):
     avg_actual_apc = df['APC Actual'].mean()
     if avg_target_apc > 0:
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
-        scores['apc'] = (acv_apv * weights['APC']) / 100
+        scores['apc'] = (acv_apc * weights['APC']) / 100  # Fixed typo here
     
     scores['total'] = sum(scores.values())
     return scores
