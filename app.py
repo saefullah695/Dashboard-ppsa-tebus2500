@@ -740,23 +740,48 @@ def detect_outliers(df):
     return outliers.sort_values('TOTAL SCORE PPSA', ascending=False)
 
 def calculate_shift_performance(df):
-    """Calculate performance metrics by shift"""
+    """Calculate performance metrics by shift dengan metode perhitungan yang benar"""
     if df.empty or 'SHIFT' not in df.columns:
         return pd.DataFrame()
     
-    # Group by shift and calculate metrics
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    
+    # Group by shift and calculate raw metrics
     shift_performance = df.groupby('SHIFT').agg({
-        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count'],
-        'SCORE PSM': 'mean',
-        'SCORE PWP': 'mean',
-        'SCORE SG': 'mean',
-        'SCORE APC': 'mean',
+        'PSM Target': 'sum', 'PSM Actual': 'sum',
+        'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum',
+        'APC Target': 'mean', 'APC Actual': 'mean',  # APC menggunakan mean
         'ACTUAL TEBUS 2500': 'sum',
-        'TARGET TEBUS 2500': 'sum'
+        'TARGET TEBUS 2500': 'sum',
+        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count']
     }).reset_index()
     
     # Flatten column names
     shift_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in shift_performance.columns.values]
+    
+    # Calculate ACV for each component
+    for comp in ['PSM', 'PWP', 'SG']:
+        target_col = f'{comp} Target_sum'
+        actual_col = f'{comp} Actual_sum'
+        if target_col in shift_performance.columns and actual_col in shift_performance.columns:
+            acv_col = f'ACV {comp} (%)'
+            shift_performance[acv_col] = (shift_performance[actual_col] / 
+                                        shift_performance[target_col] * 100).fillna(0)
+            score_col = f'SCORE {comp}'
+            shift_performance[score_col] = (shift_performance[acv_col] * weights[comp]) / 100
+    
+    # For APC - use average
+    if 'APC Target_mean' in shift_performance.columns and 'APC Actual_mean' in shift_performance.columns:
+        shift_performance['ACV APC (%)'] = (shift_performance['APC Actual_mean'] / 
+                                          shift_performance['APC Target_mean'] * 100).fillna(0)
+        shift_performance['SCORE APC'] = (shift_performance['ACV APC (%)'] * weights['APC']) / 100
+    
+    # Calculate total PPSA score correctly
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC'] 
+                 if f'SCORE {comp}' in shift_performance.columns]
+    if score_cols:
+        shift_performance['TOTAL SCORE PPSA'] = shift_performance[score_cols].sum(axis=1)
     
     # Calculate ACV for Tebus
     shift_performance['ACV TEBUS (%)'] = (shift_performance['ACTUAL TEBUS 2500_sum'] / 
@@ -764,36 +789,57 @@ def calculate_shift_performance(df):
     
     # Rename columns for clarity
     shift_performance = shift_performance.rename(columns={
-        'TOTAL SCORE PPSA_mean': 'Avg Score',
+        'TOTAL SCORE PPSA_mean': 'Avg Original Score',
         'TOTAL SCORE PPSA_median': 'Median Score',
         'TOTAL SCORE PPSA_std': 'Score Std Dev',
         'TOTAL SCORE PPSA_count': 'Record Count',
-        'SCORE PSM_mean': 'Avg PSM Score',
-        'SCORE PWP_mean': 'Avg PWP Score',
-        'SCORE SG_mean': 'Avg SG Score',
-        'SCORE APC_mean': 'Avg APC Score'
     })
     
-    return shift_performance.sort_values('Avg Score', ascending=False)
+    return shift_performance.sort_values('TOTAL SCORE PPSA', ascending=False)
 
 def calculate_daily_performance(df):
-    """Calculate performance metrics by day"""
+    """Calculate performance metrics by day dengan metode perhitungan yang benar"""
     if df.empty or 'TANGGAL' not in df.columns:
         return pd.DataFrame()
     
-    # Group by date and calculate metrics
+    weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
+    
+    # Group by date and calculate raw metrics
     daily_performance = df.groupby('TANGGAL').agg({
-        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count'],
-        'SCORE PSM': 'mean',
-        'SCORE PWP': 'mean',
-        'SCORE SG': 'mean',
-        'SCORE APC': 'mean',
+        'PSM Target': 'sum', 'PSM Actual': 'sum',
+        'PWP Target': 'sum', 'PWP Actual': 'sum',
+        'SG Target': 'sum', 'SG Actual': 'sum',
+        'APC Target': 'mean', 'APC Actual': 'mean',  # APC menggunakan mean
         'ACTUAL TEBUS 2500': 'sum',
-        'TARGET TEBUS 2500': 'sum'
+        'TARGET TEBUS 2500': 'sum',
+        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count']
     }).reset_index()
     
     # Flatten column names
     daily_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in daily_performance.columns.values]
+    
+    # Calculate ACV for each component
+    for comp in ['PSM', 'PWP', 'SG']:
+        target_col = f'{comp} Target_sum'
+        actual_col = f'{comp} Actual_sum'
+        if target_col in daily_performance.columns and actual_col in daily_performance.columns:
+            acv_col = f'ACV {comp} (%)'
+            daily_performance[acv_col] = (daily_performance[actual_col] / 
+                                        daily_performance[target_col] * 100).fillna(0)
+            score_col = f'SCORE {comp}'
+            daily_performance[score_col] = (daily_performance[acv_col] * weights[comp]) / 100
+    
+    # For APC - use average
+    if 'APC Target_mean' in daily_performance.columns and 'APC Actual_mean' in daily_performance.columns:
+        daily_performance['ACV APC (%)'] = (daily_performance['APC Actual_mean'] / 
+                                          daily_performance['APC Target_mean'] * 100).fillna(0)
+        daily_performance['SCORE APC'] = (daily_performance['ACV APC (%)'] * weights['APC']) / 100
+    
+    # Calculate total PPSA score correctly
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC'] 
+                 if f'SCORE {comp}' in daily_performance.columns]
+    if score_cols:
+        daily_performance['TOTAL SCORE PPSA'] = daily_performance[score_cols].sum(axis=1)
     
     # Calculate ACV for Tebus
     daily_performance['ACV TEBUS (%)'] = (daily_performance['ACTUAL TEBUS 2500_sum'] / 
@@ -804,14 +850,10 @@ def calculate_daily_performance(df):
     
     # Rename columns for clarity
     daily_performance = daily_performance.rename(columns={
-        'TOTAL SCORE PPSA_mean': 'Avg Score',
+        'TOTAL SCORE PPSA_mean': 'Avg Original Score',
         'TOTAL SCORE PPSA_median': 'Median Score',
         'TOTAL SCORE PPSA_std': 'Score Std Dev',
         'TOTAL SCORE PPSA_count': 'Record Count',
-        'SCORE PSM_mean': 'Avg PSM Score',
-        'SCORE PWP_mean': 'Avg PWP Score',
-        'SCORE SG_mean': 'Avg SG Score',
-        'SCORE APC_mean': 'Avg APC Score'
     })
     
     return daily_performance.sort_values('TANGGAL')
@@ -2017,7 +2059,7 @@ def main():
                             {best_shift['SHIFT']}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {best_shift['Avg Score']:.1f}
+                            Avg Score: {best_shift['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -2034,7 +2076,7 @@ def main():
                             {worst_shift['SHIFT']}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {worst_shift['Avg Score']:.1f}
+                            Avg Score: {worst_shift['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -2064,10 +2106,10 @@ def main():
                 # Add bars for average score
                 fig_shift.add_trace(go.Bar(
                     x=shift_performance['SHIFT'],
-                    y=shift_performance['Avg Score'],
-                    name='Average Score',
+                    y=shift_performance['TOTAL SCORE PPSA'],
+                    name='Total Score',
                     marker_color=['#667eea', '#764ba2', '#f093fb'][:len(shift_performance)],
-                    text=[f"{score:.1f}" for score in shift_performance['Avg Score']],
+                    text=[f"{score:.1f}" for score in shift_performance['TOTAL SCORE PPSA']],
                     textposition='outside'
                 ))
                 
@@ -2104,7 +2146,7 @@ def main():
                 st.subheader("🎯 Component Performance by Shift")
                 
                 # Create a dataframe for component comparison
-                component_cols = ['SHIFT', 'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score']
+                component_cols = ['SHIFT', 'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']
                 component_df = shift_performance[component_cols].melt(
                     id_vars=['SHIFT'], 
                     var_name='Component', 
@@ -2112,7 +2154,7 @@ def main():
                 )
                 
                 # Clean component names
-                component_df['Component'] = component_df['Component'].str.replace('Avg ', '').str.replace(' Score', '')
+                component_df['Component'] = component_df['Component'].str.replace('SCORE ', '')
                 
                 fig_component = px.bar(
                     component_df, 
@@ -2179,7 +2221,7 @@ def main():
                 display_shift_df = shift_performance.copy()
                 
                 # Add performance categories
-                display_shift_df['Performance Category'] = display_shift_df['Avg Score'].apply(
+                display_shift_df['Performance Category'] = display_shift_df['TOTAL SCORE PPSA'].apply(
                     lambda x: "🏆 Excellent" if x >= 120 else
                              "⭐ Good" if x >= 100 else
                              "⚠️ Needs Improvement" if x >= 80 else
@@ -2188,8 +2230,8 @@ def main():
                 
                 # Select columns to display
                 display_cols = [
-                    'SHIFT', 'Avg Score', 'Median Score', 'Performance Category',
-                    'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score',
+                    'SHIFT', 'TOTAL SCORE PPSA', 'Median Score', 'Performance Category',
+                    'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC',
                     'ACV TEBUS (%)', 'Record Count'
                 ]
                 
@@ -2201,13 +2243,13 @@ def main():
                     use_container_width=True,
                     column_config={
                         'SHIFT': st.column_config.TextColumn("Shift", width="small"),
-                        'Avg Score': st.column_config.NumberColumn("Avg Score", format="%.1f", width="small"),
+                        'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Score", format="%.1f", width="small"),
                         'Median Score': st.column_config.NumberColumn("Median Score", format="%.1f", width="small"),
                         'Performance Category': st.column_config.TextColumn("Category", width="medium"),
-                        'Avg PSM Score': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
-                        'Avg PWP Score': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
-                        'Avg SG Score': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
-                        'Avg APC Score': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
+                        'SCORE PSM': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
+                        'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
+                        'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
+                        'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
                         'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
@@ -2225,7 +2267,7 @@ def main():
                 shift_insights.append({
                     'type': 'success',
                     'title': f'🏆 Best Performing Shift: {best_shift["SHIFT"]}',
-                    'text': f"Dengan rata-rata score {best_shift['Avg Score']:.1f} dan median {best_shift['Median Score']:.1f}"
+                    'text': f"Dengan total score {best_shift['TOTAL SCORE PPSA']:.1f} dan median {best_shift['Median Score']:.1f}"
                 })
                 
                 # Most consistent shift
@@ -2289,7 +2331,7 @@ def main():
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    best_day = daily_performance.loc[daily_performance['Avg Score'].idxmax()]
+                    best_day = daily_performance.loc[daily_performance['TOTAL SCORE PPSA'].idxmax()]
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2300,13 +2342,13 @@ def main():
                             {best_day['TANGGAL'].strftime('%d %b %Y')}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {best_day['Avg Score']:.1f}
+                            Score: {best_day['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    worst_day = daily_performance.loc[daily_performance['Avg Score'].idxmin()]
+                    worst_day = daily_performance.loc[daily_performance['TOTAL SCORE PPSA'].idxmin()]
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2317,7 +2359,7 @@ def main():
                             {worst_day['TANGGAL'].strftime('%d %b %Y')}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {worst_day['Avg Score']:.1f}
+                            Score: {worst_day['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -2344,12 +2386,12 @@ def main():
                 
                 fig_daily = go.Figure()
                 
-                # Add line for average score
+                # Add line for total score
                 fig_daily.add_trace(go.Scatter(
                     x=daily_performance['TANGGAL'],
-                    y=daily_performance['Avg Score'],
+                    y=daily_performance['TOTAL SCORE PPSA'],
                     mode='lines+markers',
-                    name='Average Score',
+                    name='Total Score',
                     line=dict(color='#667eea', width=3),
                     marker=dict(size=8)
                 ))
@@ -2375,7 +2417,7 @@ def main():
                 # Add shaded area for standard deviation
                 fig_daily.add_trace(go.Scatter(
                     x=daily_performance['TANGGAL'],
-                    y=daily_performance['Avg Score'] + daily_performance['Score Std Dev'],
+                    y=daily_performance['TOTAL SCORE PPSA'] + daily_performance['Score Std Dev'],
                     mode='lines',
                     line=dict(width=0),
                     showlegend=False
@@ -2383,7 +2425,7 @@ def main():
                 
                 fig_daily.add_trace(go.Scatter(
                     x=daily_performance['TANGGAL'],
-                    y=daily_performance['Avg Score'] - daily_performance['Score Std Dev'],
+                    y=daily_performance['TOTAL SCORE PPSA'] - daily_performance['Score Std Dev'],
                     mode='lines',
                     line=dict(width=0),
                     fill='tonexty',
@@ -2520,7 +2562,7 @@ def main():
                 display_daily_df = daily_performance.copy()
                 
                 # Add performance categories
-                display_daily_df['Performance Category'] = display_daily_df['Avg Score'].apply(
+                display_daily_df['Performance Category'] = display_daily_df['TOTAL SCORE PPSA'].apply(
                     lambda x: "🏆 Excellent" if x >= 120 else
                              "⭐ Good" if x >= 100 else
                              "⚠️ Needs Improvement" if x >= 80 else
@@ -2532,8 +2574,8 @@ def main():
                 
                 # Select columns to display
                 display_cols = [
-                    'Date', 'Day of Week', 'Avg Score', 'Median Score', 'Performance Category',
-                    'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score',
+                    'Date', 'Day of Week', 'TOTAL SCORE PPSA', 'Median Score', 'Performance Category',
+                    'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC',
                     'ACV TEBUS (%)', 'Record Count'
                 ]
                 
@@ -2546,13 +2588,13 @@ def main():
                     column_config={
                         'Date': st.column_config.TextColumn("Date", width="small"),
                         'Day of Week': st.column_config.TextColumn("Day", width="small"),
-                        'Avg Score': st.column_config.NumberColumn("Avg Score", format="%.1f", width="small"),
+                        'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Score", format="%.1f", width="small"),
                         'Median Score': st.column_config.NumberColumn("Median Score", format="%.1f", width="small"),
                         'Performance Category': st.column_config.TextColumn("Category", width="medium"),
-                        'Avg PSM Score': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
-                        'Avg PWP Score': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
-                        'Avg SG Score': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
-                        'Avg APC Score': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
+                        'SCORE PSM': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
+                        'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
+                        'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
+                        'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
                         'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
@@ -2566,11 +2608,11 @@ def main():
                 daily_insights = []
                 
                 # Best performing day
-                best_day = daily_performance.loc[daily_performance['Avg Score'].idxmax()]
+                best_day = daily_performance.loc[daily_performance['TOTAL SCORE PPSA'].idxmax()]
                 daily_insights.append({
                     'type': 'success',
                     'title': f'🏆 Best Performing Day: {best_day["TANGGAL"].strftime("%d %b %Y")} ({best_day["Day of Week"]})',
-                    'text': f"Dengan rata-rata score {best_day['Avg Score']:.1f} dan median {best_day['Median Score']:.1f}"
+                    'text': f"Dengan total score {best_day['TOTAL SCORE PPSA']:.1f} dan median {best_day['Median Score']:.1f}"
                 })
                 
                 # Most consistent day
