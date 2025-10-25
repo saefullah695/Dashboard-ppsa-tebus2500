@@ -35,10 +35,7 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "insights": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 11H7v9h2v-9zm4-4h-2v13h2V7zm4-4h-2v17h2V3z" fill="{color}"/></svg>',
         "correlation": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>',
         "shift": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="{color}"/></svg>',
-        "calendar": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="{color}"/></svg>',
-        "trending": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="{color}"/></svg>',
-        "users": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="{color}"/></svg>',
-        "star": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="{color}"/></svg>'
+        "calendar": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="{color}"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -568,7 +565,7 @@ def calculate_overall_ppsa_breakdown(df):
     avg_actual_apc = df['APC Actual'].mean()
     if avg_target_apc > 0:
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
-        scores['apc'] = (acv_apc * weights['APC']) / 100
+        scores['apc'] = (acv_apv * weights['APC']) / 100
     
     scores['total'] = sum(scores.values())
     return scores
@@ -838,47 +835,6 @@ def calculate_day_of_week_performance(df):
     
     return day_performance
 
-def calculate_team_metrics(df):
-    """Calculate team-wide metrics for display"""
-    if df.empty:
-        return {}
-    
-    metrics = {}
-    
-    # Total records
-    metrics['total_records'] = len(df)
-    
-    # Unique cashiers
-    if 'NAMA KASIR' in df.columns:
-        metrics['unique_cashiers'] = df['NAMA KASIR'].nunique()
-    else:
-        metrics['unique_cashiers'] = 0
-    
-    # Performance metrics
-    metrics['avg_score'] = df['TOTAL SCORE PPSA'].mean()
-    metrics['median_score'] = df['TOTAL SCORE PPSA'].median()
-    metrics['max_score'] = df['TOTAL SCORE PPSA'].max()
-    metrics['min_score'] = df['TOTAL SCORE PPSA'].min()
-    
-    # Achievement rates
-    metrics['above_target'] = (df['TOTAL SCORE PPSA'] >= 100).sum()
-    metrics['below_target'] = (df['TOTAL SCORE PPSA'] < 100).sum()
-    metrics['achievement_rate'] = (metrics['above_target'] / metrics['total_records']) * 100
-    
-    # Component performance
-    components = ['PSM', 'PWP', 'SG', 'APC']
-    for comp in components:
-        if f'SCORE {comp}' in df.columns:
-            metrics[f'avg_{comp.lower()}_score'] = df[f'SCORE {comp}'].mean()
-    
-    # Tebus performance
-    if 'ACTUAL TEBUS 2500' in df.columns and 'TARGET TEBUS 2500' in df.columns:
-        total_target = df['TARGET TEBUS 2500'].sum()
-        total_actual = df['ACTUAL TEBUS 2500'].sum()
-        metrics['tebus_acv'] = (total_actual / total_target * 100) if total_target > 0 else 0
-    
-    return metrics
-
 # --- MAIN DASHBOARD ---
 def main():
     # Dashboard Header
@@ -989,10 +945,7 @@ def main():
         # Overall Performance Summary
         overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
         
-        st.markdown('<div class="content-container">', unsafe_allow_html=True)
-        st.markdown('<h2 class="section-header">🏆 Executive Summary</h2>', unsafe_allow_html=True)
-        
-        # KPI Metrics
+        # KPI Metrics (Direct without extra container)
         col1, col2, col3, col4 = st.columns(4, gap="medium")
         
         metrics = [
@@ -1021,90 +974,27 @@ def main():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+        # Total PPSA Card (Centered)
+        st.markdown('<div style="display: flex; justify-content: center; margin: 2rem 0;">', unsafe_allow_html=True)
+        
+        gap_value = overall_scores['total'] - 100
+        gap_color = '#10b981' if gap_value >= 0 else '#ef4444'
+        
+        st.markdown(f"""
+        <div class="total-ppsa-card" style="max-width: 500px;">
+            <div class="total-ppsa-label">
+                {get_svg_icon("trophy", size=40, color="white")} 
+                TOTAL PPSA SCORE
+            </div>
+            <div class="total-ppsa-value">{overall_scores['total']:.1f}</div>
+            <div style="font-size: 1.2rem; margin-top: 1rem; opacity: 0.9;">
+                Gap: <span style="color: {'#90EE90' if gap_value >= 0 else '#FFB6C1'};">{gap_value:+.1f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
-
-        # Total PPSA Card and Team Metrics
-        col_total, col_team = st.columns([1, 2], gap="large")
-        
-        with col_total:
-            gap_value = overall_scores['total'] - 100
-            gap_color = '#10b981' if gap_value >= 0 else '#ef4444'
-            
-            st.markdown(f"""
-            <div class="total-ppsa-card">
-                <div class="total-ppsa-label">
-                    {get_svg_icon("trophy", size=40, color="white")} 
-                    TOTAL PPSA SCORE
-                </div>
-                <div class="total-ppsa-value">{overall_scores['total']:.1f}</div>
-                <div style="font-size: 1.2rem; margin-top: 1rem; opacity: 0.9;">
-                    Gap: <span style="color: {'#90EE90' if gap_value >= 0 else '#FFB6C1'};">{gap_value:+.1f}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col_team:
-            # Calculate team metrics
-            team_metrics = calculate_team_metrics(filtered_df)
-            
-            st.markdown('<div class="content-container" style="height: 280px; overflow-y: auto;">', unsafe_allow_html=True)
-            st.markdown('<h3 class="section-header" style="font-size: 1.5rem; margin-bottom: 1rem;">👥 Team Performance Metrics</h3>', unsafe_allow_html=True)
-            
-            # Display team metrics in a grid
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="metric-card" style="height: 100px; margin-bottom: 10px;">
-                    <div class="metric-label" style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                        {get_svg_icon("users", size=16, color="#667eea")} 
-                        Total Team Members
-                    </div>
-                    <div class="metric-value" style="font-size: 1.8rem;">
-                        {team_metrics.get('unique_cashiers', 0)}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f"""
-                <div class="metric-card" style="height: 100px; margin-bottom: 10px;">
-                    <div class="metric-label" style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                        {get_svg_icon("trending", size=16, color="#10b981")} 
-                        Achievement Rate
-                    </div>
-                    <div class="metric-value" style="font-size: 1.8rem; color: #10b981;">
-                        {team_metrics.get('achievement_rate', 0):.1f}%
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div class="metric-card" style="height: 100px; margin-bottom: 10px;">
-                    <div class="metric-label" style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                        {get_svg_icon("star", size=16, color="#f59e0b")} 
-                        Average Score
-                    </div>
-                    <div class="metric-value" style="font-size: 1.8rem; color: #f59e0b;">
-                        {team_metrics.get('avg_score', 0):.1f}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f"""
-                <div class="metric-card" style="height: 100px; margin-bottom: 10px;">
-                    <div class="metric-label" style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                        {get_svg_icon("tebus", size=16, color="#764ba2")} 
-                        Tebus ACV
-                    </div>
-                    <div class="metric-value" style="font-size: 1.8rem; color: #764ba2;">
-                        {team_metrics.get('tebus_acv', 0):.1f}%
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
 
         # AI Insights Section
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
