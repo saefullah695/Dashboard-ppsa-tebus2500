@@ -515,6 +515,11 @@ def process_data(df):
         
         # Handle any unmapped values
         df['SHIFT'] = df['SHIFT'].fillna('Unknown')
+    elif 'SHIFT' in df.columns:
+        # If SHIFT column already exists with proper names, ensure it's consistent
+        # This handles the case where the spreadsheet already has the correct shift names
+        valid_shifts = ['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)']
+        df['SHIFT'] = df['SHIFT'].apply(lambda x: x if x in valid_shifts else 'Unknown')
     else:
         # If no shift column, create a default shift based on random assignment for demo
         np.random.seed(42)
@@ -795,7 +800,12 @@ def calculate_shift_performance(df):
         'TOTAL SCORE PPSA_count': 'Record Count',
     })
     
-    return shift_performance.sort_values('TOTAL SCORE PPSA', ascending=False)
+    # Sort by shift order: Shift 1 (Pagi), Shift 2 (Siang), Shift 3 (Malam)
+    shift_order = ['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)']
+    shift_performance['SHIFT'] = pd.Categorical(shift_performance['SHIFT'], categories=shift_order, ordered=True)
+    shift_performance = shift_performance.sort_values('SHIFT')
+    
+    return shift_performance
 
 def calculate_daily_performance(df):
     """Calculate performance metrics by day dengan metode perhitungan yang benar"""
@@ -2048,7 +2058,7 @@ def main():
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    best_shift = shift_performance.iloc[0]
+                    best_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmax()]
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2059,13 +2069,13 @@ def main():
                             {best_shift['SHIFT']}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {best_shift['TOTAL SCORE PPSA']:.1f}
+                            Total Score: {best_shift['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    worst_shift = shift_performance.iloc[-1]
+                    worst_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmin()]
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2076,7 +2086,7 @@ def main():
                             {worst_shift['SHIFT']}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Avg Score: {worst_shift['TOTAL SCORE PPSA']:.1f}
+                            Total Score: {worst_shift['TOTAL SCORE PPSA']:.1f}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -2103,7 +2113,7 @@ def main():
                 
                 fig_shift = go.Figure()
                 
-                # Add bars for average score
+                # Add bars for total score
                 fig_shift.add_trace(go.Bar(
                     x=shift_performance['SHIFT'],
                     y=shift_performance['TOTAL SCORE PPSA'],
@@ -2263,7 +2273,7 @@ def main():
                 shift_insights = []
                 
                 # Best performing shift
-                best_shift = shift_performance.iloc[0]
+                best_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmax()]
                 shift_insights.append({
                     'type': 'success',
                     'title': f'🏆 Best Performing Shift: {best_shift["SHIFT"]}',
