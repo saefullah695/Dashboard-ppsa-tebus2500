@@ -389,31 +389,24 @@ if not raw_df.empty:
             st.plotly_chart(fig_gap_cashier, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- PERBAIKAN: SECTION TOP & FLOP PERFORMANCE ---
+        # --- PERBAIKAN: SECTION FLOP PERFORMANCE ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
-        st.markdown('<h2 class="section-header">🥇📉 Top & Flop Performance</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">📉 Flop Performance</h2>', unsafe_allow_html=True)
         
         if not score_summary.empty:
             # Tentukan jumlah top dan flop performer
-            NUM_TOP_PERFORMERS = 5
+            NUM_TOP_PERFORMERS = 5  # Tetap digunakan untuk menentukan sisa kasir
             NUM_FLOP_PERFORMERS = 2
 
-            # Ambil Top Performers
-            top_performers = score_summary.head(NUM_TOP_PERFORMERS).copy()
-            top_performers['Ranking'] = range(1, len(top_performers) + 1)
-            
             # Pisahkan sisanya untuk mencari Flop Performers
             remaining_cashiers = score_summary.iloc[NUM_TOP_PERFORMERS:]
             
             # Ambil Flop Performers dari sisa kasir
             flop_performers = remaining_cashiers.tail(NUM_FLOP_PERFORMERS).sort_values(by='TOTAL SCORE PPSA', ascending=True).copy()
 
-            top_col, flop_col = st.columns(2, gap="large")
-            
-            with top_col:
-                st.markdown("##### 🥇 Top 5 Performers (Skor Tertinggi)")
-                top_config = {
-                    'Ranking': st.column_config.NumberColumn("Ranking", width="small"),
+            st.markdown("##### 📉 2 Performers Terendah (Perlu Perhatian)")
+            if not flop_performers.empty:
+                flop_config = {
                     'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
                     'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Skor", format="%.2f", width="medium"),
                     'SCORE PSM': st.column_config.NumberColumn("Skor PSM", format="%.2f"),
@@ -421,22 +414,9 @@ if not raw_df.empty:
                     'SCORE SG': st.column_config.NumberColumn("Skor SG", format="%.2f"),
                     'SCORE APC': st.column_config.NumberColumn("Skor APC", format="%.2f"),
                 }
-                st.dataframe(top_performers, use_container_width=True, column_config=top_config, hide_index=True)
-
-            with flop_col:
-                st.markdown("##### 📉 2 Performers Terendah (Perlu Perhatian)")
-                if not flop_performers.empty:
-                    flop_config = {
-                        'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
-                        'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Skor", format="%.2f", width="medium"),
-                        'SCORE PSM': st.column_config.NumberColumn("Skor PSM", format="%.2f"),
-                        'SCORE PWP': st.column_config.NumberColumn("Skor PWP", format="%.2f"),
-                        'SCORE SG': st.column_config.NumberColumn("Skor SG", format="%.2f"),
-                        'SCORE APC': st.column_config.NumberColumn("Skor APC", format="%.2f"),
-                    }
-                    st.dataframe(flop_performers, use_container_width=True, column_config=flop_config, hide_index=True)
-                else:
-                    st.info("Semua kasir berada di kategori top performer. Tidak ada flop performer untuk ditampilkan.")
+                st.dataframe(flop_performers, use_container_width=True, column_config=flop_config, hide_index=True)
+            else:
+                st.info("Semua kasir berada di kategori top performer. Tidak ada flop performer untuk ditampilkan.")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
