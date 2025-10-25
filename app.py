@@ -800,7 +800,7 @@ def calculate_shift_performance(df):
     if score_cols:
         shift_performance['TOTAL SCORE PPSA'] = shift_performance[score_cols].sum(axis=1)
     
-    # Calculate ACV for Tebus
+    # Calculate ACV for Tebus - PERBAIKAN: Pastikan format persentase benar
     shift_performance['ACV TEBUS (%)'] = (shift_performance['ACTUAL TEBUS 2500_sum'] / 
                                         shift_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
     
@@ -866,7 +866,7 @@ def calculate_daily_performance(df):
     if score_cols:
         daily_performance['TOTAL SCORE PPSA'] = daily_performance[score_cols].sum(axis=1)
     
-    # Calculate ACV for Tebus
+    # Calculate ACV for Tebus - PERBAIKAN: Pastikan format persentase benar
     daily_performance['ACV TEBUS (%)'] = (daily_performance['ACTUAL TEBUS 2500_sum'] / 
                                         daily_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
     
@@ -905,7 +905,7 @@ def calculate_day_of_week_performance(df):
     # Flatten column names
     day_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in day_performance.columns.values]
     
-    # Calculate ACV for Tebus
+    # Calculate ACV for Tebus - PERBAIKAN: Pastikan format persentase benar
     day_performance['ACV TEBUS (%)'] = (day_performance['ACTUAL TEBUS 2500_sum'] / 
                                       day_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
     
@@ -2053,7 +2053,7 @@ def main():
             # Display action plan
             st.success("🎯 **Action Plan Generated:**")
             for action in action_plan:
-                st.write(action_plan)
+                st.write(action)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2350,7 +2350,7 @@ def main():
                         'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
                         'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
                         'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
-                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
+                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%%", width="small"),  # PERBAIKAN: Format persentase benar
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
                     hide_index=True
@@ -2716,7 +2716,7 @@ def main():
                         'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
                         'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
                         'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
-                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
+                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%%", width="small"),  # PERBAIKAN: Format persentase benar
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
                     hide_index=True
