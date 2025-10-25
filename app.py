@@ -2328,11 +2328,15 @@ def main():
                              "🚨 Critical" if pd.notna(x) else "📊 No Data"
                 )
                 
+                # PERBAIKAN: Buat kolom baru dengan format persentase yang benar
+                if 'ACV TEBUS (%)' in display_shift_df.columns:
+                    display_shift_df['ACV TEBUS FORMATTED'] = display_shift_df['ACV TEBUS (%)'].apply(lambda x: f"{x:.1f}%")
+                
                 # Select columns to display
                 display_cols = [
                     'SHIFT', 'TOTAL SCORE PPSA', 'Median Score', 'Performance Category',
                     'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC',
-                    'ACV TEBUS (%)', 'Record Count'
+                    'ACV TEBUS FORMATTED', 'Record Count'
                 ]
                 
                 # Filter to only available columns
@@ -2350,7 +2354,7 @@ def main():
                         'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
                         'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
                         'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
-                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%%", width="small"),  # PERBAIKAN: Format persentase benar
+                        'ACV TEBUS FORMATTED': st.column_config.TextColumn("Tebus ACV", width="small"),  # PERBAIKAN: Gunakan TextColumn
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
                     hide_index=True
@@ -2693,11 +2697,15 @@ def main():
                 # Format date for display
                 display_daily_df['Date'] = display_daily_df['TANGGAL'].dt.strftime('%d %b %Y')
                 
+                # PERBAIKAN: Buat kolom baru dengan format persentase yang benar
+                if 'ACV TEBUS (%)' in display_daily_df.columns:
+                    display_daily_df['ACV TEBUS FORMATTED'] = display_daily_df['ACV TEBUS (%)'].apply(lambda x: f"{x:.1f}%")
+                
                 # Select columns to display
                 display_cols = [
                     'Date', 'Day of Week', 'TOTAL SCORE PPSA', 'Median Score', 'Performance Category',
                     'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC',
-                    'ACV TEBUS (%)', 'Record Count'
+                    'ACV TEBUS FORMATTED', 'Record Count'
                 ]
                 
                 # Filter to only available columns
@@ -2716,7 +2724,7 @@ def main():
                         'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
                         'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
                         'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
-                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%%", width="small"),  # PERBAIKAN: Format persentase benar
+                        'ACV TEBUS FORMATTED': st.column_config.TextColumn("Tebus ACV", width="small"),  # PERBAIKAN: Gunakan TextColumn
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
                     hide_index=True
