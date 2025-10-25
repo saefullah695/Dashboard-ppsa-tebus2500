@@ -501,7 +501,21 @@ def process_data(df):
         df['HARI'] = df['HARI'].map(hari_map)
     
     # Process shift column - PERBAIKAN UTAMA
-    if 'shift' in df.columns:
+    if 'SHIFT' in df.columns:
+        # Convert shift to string if it's not already
+        df['SHIFT'] = df['SHIFT'].astype(str)
+        
+        # Map shift values to meaningful names
+        shift_map = {
+            '1': 'Shift 1 (Pagi)',
+            '2': 'Shift 2 (Siang)',
+            '3': 'Shift 3 (Malam)'
+        }
+        df['SHIFT'] = df['SHIFT'].map(shift_map)
+        
+        # Handle any unmapped values
+        df['SHIFT'] = df['SHIFT'].fillna('Unknown')
+    elif 'shift' in df.columns:
         # Convert shift to numeric if it's not already
         df['shift'] = pd.to_numeric(df['shift'], errors='coerce')
         
@@ -515,11 +529,6 @@ def process_data(df):
         
         # Handle any unmapped values
         df['SHIFT'] = df['SHIFT'].fillna('Unknown')
-    elif 'SHIFT' in df.columns:
-        # If SHIFT column already exists with proper names, ensure it's consistent
-        # This handles the case where the spreadsheet already has the correct shift names
-        valid_shifts = ['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)']
-        df['SHIFT'] = df['SHIFT'].apply(lambda x: x if x in valid_shifts else 'Unknown')
     else:
         # If no shift column, create a default shift based on random assignment for demo
         np.random.seed(42)
@@ -2044,7 +2053,7 @@ def main():
             # Display action plan
             st.success("🎯 **Action Plan Generated:**")
             for action in action_plan:
-                st.write(action)
+                st.write(action_plan)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
