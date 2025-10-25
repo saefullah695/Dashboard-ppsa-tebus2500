@@ -389,22 +389,18 @@ if not raw_df.empty:
             st.plotly_chart(fig_gap_cashier, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- PERBAIKAN: SECTION FLOP PERFORMANCE ---
+        # --- PERBAIKAN FINAL: SECTION FLOP PERFORMANCE ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">📉 Flop Performance</h2>', unsafe_allow_html=True)
         
         if not score_summary.empty:
-            # Tentukan jumlah top dan flop performer
-            NUM_TOP_PERFORMERS = 5  # Tetap digunakan untuk menentukan sisa kasir
-            NUM_FLOP_PERFORMERS = 2
+            # Tentukan jumlah top performer
+            NUM_TOP_PERFORMERS = 3
 
-            # Pisahkan sisanya untuk mencari Flop Performers
-            remaining_cashiers = score_summary.iloc[NUM_TOP_PERFORMERS:]
-            
-            # Ambil Flop Performers dari sisa kasir
-            flop_performers = remaining_cashiers.tail(NUM_FLOP_PERFORMERS).sort_values(by='TOTAL SCORE PPSA', ascending=True).copy()
+            # Pisahkan sisanya untuk Flop Performers (semua kasir dari peringkat 4 ke bawah)
+            flop_performers = score_summary.iloc[NUM_TOP_PERFORMERS:].copy()
 
-            st.markdown("##### 📉 2 Performers Terendah (Perlu Perhatian)")
+            st.markdown("##### 📉 Daftar Performers Terendah (Perlu Perhatian)")
             if not flop_performers.empty:
                 flop_config = {
                     'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
@@ -416,7 +412,7 @@ if not raw_df.empty:
                 }
                 st.dataframe(flop_performers, use_container_width=True, column_config=flop_config, hide_index=True)
             else:
-                st.info("Semua kasir berada di kategori top performer. Tidak ada flop performer untuk ditampilkan.")
+                st.info("Tidak ada flop performer. Semua kasir berada di kategori Top 3.")
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
