@@ -23,7 +23,10 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "sg": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="{color}"/></svg>',
         "apc": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" fill="{color}"/></svg>',
         "tebus": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="{color}"/></svg>',
-        "trophy": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" fill="{color}"/></svg>'
+        "trophy": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" fill="{color}"/></svg>',
+        "gold": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#FFD700"/></svg>',
+        "silver": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#C0C0C0"/></svg>',
+        "bronze": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#CD7F32"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -63,6 +66,11 @@ st.markdown("""
 @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .content-container { animation: fadeIn 0.6s ease-out; }
 #MainMenu, footer, header { visibility: hidden; }
+.top-performer-card { background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%); border-radius: 16px; padding: 1.5rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); border: 1px solid rgba(102, 126, 234, 0.1); transition: all 0.3s ease; position: relative; overflow: hidden; height: 100%; text-align: center; }
+.top-performer-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(102, 126, 234, 0.2); }
+.top-performer-icon { font-size: 3rem; margin-bottom: 1rem; }
+.top-performer-name { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem; }
+.top-performer-score { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -336,6 +344,31 @@ if not raw_df.empty:
             st.plotly_chart(fig_overall, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # --- TAMBAHAN: SECTION TOP 3 PERFORMERS ---
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">🥇 Top 3 Performers</h2>', unsafe_allow_html=True)
+        
+        score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
+        if not score_summary.empty and len(score_summary) >= 3:
+            top3_performers = score_summary.head(3)
+            medal_icons = ["gold", "silver", "bronze"]
+            
+            col1, col2, col3 = st.columns(3, gap="medium")
+            
+            for i, (col, performer, medal) in enumerate(zip([col1, col2, col3], top3_performers.iterrows(), medal_icons)):
+                idx, row = performer
+                with col:
+                    st.markdown(f"""
+                    <div class="top-performer-card">
+                        <div class="top-performer-icon">{get_svg_icon(medal, size=64)}</div>
+                        <div class="top-performer-name">{row['NAMA KASIR']}</div>
+                        <div class="top-performer-score">{row['TOTAL SCORE PPSA']:.2f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.warning("Tidak cukup data untuk menampilkan Top 3 Performers")
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">📉 Gap Analysis (Target 100%)</h2>', unsafe_allow_html=True)
         
@@ -356,11 +389,9 @@ if not raw_df.empty:
             st.plotly_chart(fig_gap_cashier, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- TAMBAHAN: SECTION TOP & FLOP PERFORMANCE ---
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🥇📉 Top & Flop Performance</h2>', unsafe_allow_html=True)
         
-        score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
         if not score_summary.empty:
             top_col, flop_col = st.columns(2, gap="large")
             
@@ -383,7 +414,7 @@ if not raw_df.empty:
             with flop_col:
                 st.markdown("##### 📉 5 Performers Terendah (Perlu Perhatian)")
                 flop_performers = score_summary.tail(5).sort_values(by='TOTAL SCORE PPSA', ascending=True).copy()
-                flop_performers['Ranking'] = range(len(score_summary), len(score_summary) - len(flop_performers), -1, -1)
+                flop_performers['Ranking'] = range(len(score_summary), len(score_summary) - len(flop_performers), -1)
                 
                 flop_config = {
                     'Ranking': st.column_config.NumberColumn("Ranking", width="small"),
@@ -475,15 +506,15 @@ if not raw_df.empty:
 
                 st.markdown("#### 🛒 Top 3 Performers (Tebus Suuegerr)")
                 cols = st.columns(3)
-                medals = ["🥇", "🥈", "🥉"]
+                medals = ["gold", "silver", "bronze"]
                 for idx, (col, medal) in enumerate(zip(cols, medals)):
                     if idx < len(tebus_summary):
                         with col:
                             st.markdown(f"""
-                            <div class="metric-card" style="text-align: center;">
-                                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{medal}</div>
-                                <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 0.25rem;">{tebus_summary.iloc[idx]['NAMA KASIR']}</div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%</div>
+                            <div class="top-performer-card">
+                                <div class="top-performer-icon">{get_svg_icon(medal, size=64)}</div>
+                                <div class="top-performer-name">{tebus_summary.iloc[idx]['NAMA KASIR']}</div>
+                                <div class="top-performer-score">{tebus_summary.iloc[idx]['(%) ACV TEBUS 2500']:.2f}%</div>
                             </div>
                             """, unsafe_allow_html=True)
                 
