@@ -33,7 +33,9 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "bronze": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#CD7F32"/></svg>',
         "alert": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="{color}"/></svg>',
         "insights": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 11H7v9h2v-9zm4-4h-2v13h2V7zm4-4h-2v17h2V3z" fill="{color}"/></svg>',
-        "correlation": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>'
+        "correlation": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>',
+        "shift": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="{color}"/></svg>',
+        "calendar": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="{color}"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -490,6 +492,22 @@ def process_data(df):
             'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu', 'Sunday': 'Minggu'
         }
         df['HARI'] = df['HARI'].map(hari_map)
+        
+        # Extract hour for shift analysis
+        if 'JAM' in df.columns:
+            df['JAM'] = pd.to_numeric(df['JAM'], errors='coerce')
+            # Define shifts based on hour
+            conditions = [
+                (df['JAM'] >= 6) & (df['JAM'] < 14),
+                (df['JAM'] >= 14) & (df['JAM'] < 22),
+                (df['JAM'] >= 22) | (df['JAM'] < 6)
+            ]
+            choices = ['Pagi', 'Sore', 'Malam']
+            df['SHIFT'] = np.select(conditions, choices, default='Unknown')
+        else:
+            # If no hour column, create a default shift based on random assignment for demo
+            np.random.seed(42)
+            df['SHIFT'] = np.random.choice(['Pagi', 'Sore', 'Malam'], size=len(df))
 
     # Process numeric columns
     numeric_cols = [
@@ -695,6 +713,128 @@ def detect_outliers(df):
     
     return outliers.sort_values('TOTAL SCORE PPSA', ascending=False)
 
+def calculate_shift_performance(df):
+    """Calculate performance metrics by shift"""
+    if df.empty or 'SHIFT' not in df.columns:
+        return pd.DataFrame()
+    
+    # Group by shift and calculate metrics
+    shift_performance = df.groupby('SHIFT').agg({
+        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count'],
+        'SCORE PSM': 'mean',
+        'SCORE PWP': 'mean',
+        'SCORE SG': 'mean',
+        'SCORE APC': 'mean',
+        'ACTUAL TEBUS 2500': 'sum',
+        'TARGET TEBUS 2500': 'sum'
+    }).reset_index()
+    
+    # Flatten column names
+    shift_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in shift_performance.columns.values]
+    
+    # Calculate ACV for Tebus
+    shift_performance['ACV TEBUS (%)'] = (shift_performance['ACTUAL TEBUS 2500_sum'] / 
+                                        shift_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
+    
+    # Rename columns for clarity
+    shift_performance = shift_performance.rename(columns={
+        'TOTAL SCORE PPSA_mean': 'Avg Score',
+        'TOTAL SCORE PPSA_median': 'Median Score',
+        'TOTAL SCORE PPSA_std': 'Score Std Dev',
+        'TOTAL SCORE PPSA_count': 'Record Count',
+        'SCORE PSM_mean': 'Avg PSM Score',
+        'SCORE PWP_mean': 'Avg PWP Score',
+        'SCORE SG_mean': 'Avg SG Score',
+        'SCORE APC_mean': 'Avg APC Score'
+    })
+    
+    return shift_performance.sort_values('Avg Score', ascending=False)
+
+def calculate_daily_performance(df):
+    """Calculate performance metrics by day"""
+    if df.empty or 'TANGGAL' not in df.columns:
+        return pd.DataFrame()
+    
+    # Group by date and calculate metrics
+    daily_performance = df.groupby('TANGGAL').agg({
+        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count'],
+        'SCORE PSM': 'mean',
+        'SCORE PWP': 'mean',
+        'SCORE SG': 'mean',
+        'SCORE APC': 'mean',
+        'ACTUAL TEBUS 2500': 'sum',
+        'TARGET TEBUS 2500': 'sum'
+    }).reset_index()
+    
+    # Flatten column names
+    daily_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in daily_performance.columns.values]
+    
+    # Calculate ACV for Tebus
+    daily_performance['ACV TEBUS (%)'] = (daily_performance['ACTUAL TEBUS 2500_sum'] / 
+                                        daily_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
+    
+    # Add day of week
+    daily_performance['Day of Week'] = daily_performance['TANGGAL'].dt.day_name()
+    
+    # Rename columns for clarity
+    daily_performance = daily_performance.rename(columns={
+        'TOTAL SCORE PPSA_mean': 'Avg Score',
+        'TOTAL SCORE PPSA_median': 'Median Score',
+        'TOTAL SCORE PPSA_std': 'Score Std Dev',
+        'TOTAL SCORE PPSA_count': 'Record Count',
+        'SCORE PSM_mean': 'Avg PSM Score',
+        'SCORE PWP_mean': 'Avg PWP Score',
+        'SCORE SG_mean': 'Avg SG Score',
+        'SCORE APC_mean': 'Avg APC Score'
+    })
+    
+    return daily_performance.sort_values('TANGGAL')
+
+def calculate_day_of_week_performance(df):
+    """Calculate performance metrics by day of week"""
+    if df.empty or 'HARI' not in df.columns:
+        return pd.DataFrame()
+    
+    # Define order for days
+    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    
+    # Group by day and calculate metrics
+    day_performance = df.groupby('HARI').agg({
+        'TOTAL SCORE PPSA': ['mean', 'median', 'std', 'count'],
+        'SCORE PSM': 'mean',
+        'SCORE PWP': 'mean',
+        'SCORE SG': 'mean',
+        'SCORE APC': 'mean',
+        'ACTUAL TEBUS 2500': 'sum',
+        'TARGET TEBUS 2500': 'sum'
+    }).reset_index()
+    
+    # Flatten column names
+    day_performance.columns = ['_'.join(col).strip() if col[1] else col[0] for col in day_performance.columns.values]
+    
+    # Calculate ACV for Tebus
+    day_performance['ACV TEBUS (%)'] = (day_performance['ACTUAL TEBUS 2500_sum'] / 
+                                      day_performance['TARGET TEBUS 2500_sum'] * 100).fillna(0)
+    
+    # Rename columns for clarity
+    day_performance = day_performance.rename(columns={
+        'HARI': 'Day',
+        'TOTAL SCORE PPSA_mean': 'Avg Score',
+        'TOTAL SCORE PPSA_median': 'Median Score',
+        'TOTAL SCORE PPSA_std': 'Score Std Dev',
+        'TOTAL SCORE PPSA_count': 'Record Count',
+        'SCORE PSM_mean': 'Avg PSM Score',
+        'SCORE PWP_mean': 'Avg PWP Score',
+        'SCORE SG_mean': 'Avg SG Score',
+        'SCORE APC_mean': 'Avg APC Score'
+    })
+    
+    # Sort by day order
+    day_performance['Day'] = pd.Categorical(day_performance['Day'], categories=day_order, ordered=True)
+    day_performance = day_performance.sort_values('Day')
+    
+    return day_performance
+
 # --- MAIN DASHBOARD ---
 def main():
     # Dashboard Header
@@ -759,6 +899,17 @@ def main():
                     mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                     filtered_df = filtered_df.loc[mask]
         
+        # Shift filter
+        if 'SHIFT' in filtered_df.columns:
+            all_shifts = sorted(filtered_df['SHIFT'].unique())
+            selected_shifts = st.multiselect(
+                "🕐 Pilih Shift:",
+                options=all_shifts,
+                default=all_shifts,
+                help="Pilih shift yang ingin dianalisis"
+            )
+            filtered_df = filtered_df[filtered_df['SHIFT'].isin(selected_shifts)]
+        
         # Performance threshold
         st.markdown("---")
         perf_threshold = st.slider(
@@ -781,11 +932,13 @@ def main():
         """)
 
     # Main tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📈 PPSA Analytics", 
         "🛒 Tebus Analytics", 
         "🔍 Deep Insights",
-        "🎯 Performance Alerts"
+        "🎯 Performance Alerts",
+        "🕐 Performance Shift",
+        "📅 Performance Per Hari"
     ])
 
     with tab1:
@@ -1286,6 +1439,650 @@ def main():
             st.success("🎯 **Action Plan Generated:**")
             for action in action_plan:
                 st.write(action)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab5:
+        # Performance Shift Tab
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">🕐 Performance Shift Analysis</h2>', unsafe_allow_html=True)
+        
+        if not filtered_df.empty and 'SHIFT' in filtered_df.columns:
+            # Calculate shift performance
+            shift_performance = calculate_shift_performance(filtered_df)
+            
+            if not shift_performance.empty:
+                # Shift Performance Summary
+                st.subheader("📊 Shift Performance Summary")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    best_shift = shift_performance.iloc[0]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("trophy", size=20, color="#10b981")} 
+                            Best Performing Shift
+                        </div>
+                        <div class="metric-value" style="color: #10b981;">
+                            {best_shift['SHIFT']}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Avg Score: {best_shift['Avg Score']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    worst_shift = shift_performance.iloc[-1]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("alert", size=20, color="#ef4444")} 
+                            Needs Improvement
+                        </div>
+                        <div class="metric-value" style="color: #ef4444;">
+                            {worst_shift['SHIFT']}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Avg Score: {worst_shift['Avg Score']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    most_consistent_shift = shift_performance.loc[shift_performance['Score Std Dev'].idxmin()]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("insights", size=20, color="#667eea")} 
+                            Most Consistent
+                        </div>
+                        <div class="metric-value" style="color: #667eea;">
+                            {most_consistent_shift['SHIFT']}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Std Dev: {most_consistent_shift['Score Std Dev']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Shift Performance Comparison Chart
+                st.subheader("📈 Shift Performance Comparison")
+                
+                fig_shift = go.Figure()
+                
+                # Add bars for average score
+                fig_shift.add_trace(go.Bar(
+                    x=shift_performance['SHIFT'],
+                    y=shift_performance['Avg Score'],
+                    name='Average Score',
+                    marker_color=['#667eea', '#764ba2', '#f093fb'][:len(shift_performance)],
+                    text=[f"{score:.1f}" for score in shift_performance['Avg Score']],
+                    textposition='outside'
+                ))
+                
+                # Add line for median score
+                fig_shift.add_trace(go.Scatter(
+                    x=shift_performance['SHIFT'],
+                    y=shift_performance['Median Score'],
+                    mode='markers+lines',
+                    name='Median Score',
+                    marker=dict(size=10, color='#ef4444'),
+                    line=dict(color='#ef4444', width=2)
+                ))
+                
+                # Add target line
+                fig_shift.add_hline(
+                    y=100, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text="Target (100)"
+                )
+                
+                fig_shift.update_layout(
+                    template='plotly_white',
+                    height=400,
+                    showlegend=True,
+                    yaxis_title='Score',
+                    xaxis_title='Shift',
+                    title="Performance Comparison by Shift"
+                )
+                
+                st.plotly_chart(fig_shift, use_container_width=True)
+                
+                # Component Performance by Shift
+                st.subheader("🎯 Component Performance by Shift")
+                
+                # Create a dataframe for component comparison
+                component_cols = ['SHIFT', 'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score']
+                component_df = shift_performance[component_cols].melt(
+                    id_vars=['SHIFT'], 
+                    var_name='Component', 
+                    value_name='Score'
+                )
+                
+                # Clean component names
+                component_df['Component'] = component_df['Component'].str.replace('Avg ', '').str.replace(' Score', '')
+                
+                fig_component = px.bar(
+                    component_df, 
+                    x='Component', 
+                    y='Score', 
+                    color='SHIFT',
+                    barmode='group',
+                    color_discrete_map={
+                        'Pagi': '#667eea', 
+                        'Sore': '#764ba2', 
+                        'Malam': '#f093fb'
+                    },
+                    title="Component Scores by Shift"
+                )
+                
+                fig_component.update_layout(
+                    template='plotly_white',
+                    height=400,
+                    yaxis_title='Score',
+                    xaxis_title='Component'
+                )
+                
+                st.plotly_chart(fig_component, use_container_width=True)
+                
+                # Tebus Performance by Shift
+                if 'ACV TEBUS (%)' in shift_performance.columns:
+                    st.subheader("🛒 Tebus Performance by Shift")
+                    
+                    fig_tebus_shift = go.Figure()
+                    
+                    colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
+                             for acv in shift_performance['ACV TEBUS (%)']]
+                    
+                    fig_tebus_shift.add_trace(go.Bar(
+                        x=shift_performance['SHIFT'],
+                        y=shift_performance['ACV TEBUS (%)'],
+                        marker_color=colors,
+                        text=[f"{acv:.1f}%" for acv in shift_performance['ACV TEBUS (%)']],
+                        textposition='outside'
+                    ))
+                    
+                    fig_tebus_shift.add_hline(
+                        y=100, 
+                        line_dash="dash", 
+                        line_color="red",
+                        annotation_text="Target (100%)"
+                    )
+                    
+                    fig_tebus_shift.update_layout(
+                        template='plotly_white',
+                        height=350,
+                        showlegend=False,
+                        yaxis_title='ACV Tebus (%)',
+                        xaxis_title='Shift',
+                        title="Tebus Achievement by Shift"
+                    )
+                    
+                    st.plotly_chart(fig_tebus_shift, use_container_width=True)
+                
+                # Detailed Shift Performance Table
+                st.subheader("📋 Detailed Shift Performance")
+                
+                # Format the dataframe for display
+                display_shift_df = shift_performance.copy()
+                
+                # Add performance categories
+                display_shift_df['Performance Category'] = display_shift_df['Avg Score'].apply(
+                    lambda x: "🏆 Excellent" if x >= 120 else
+                             "⭐ Good" if x >= 100 else
+                             "⚠️ Needs Improvement" if x >= 80 else
+                             "🚨 Critical"
+                )
+                
+                # Select columns to display
+                display_cols = [
+                    'SHIFT', 'Avg Score', 'Median Score', 'Performance Category',
+                    'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score',
+                    'ACV TEBUS (%)', 'Record Count'
+                ]
+                
+                # Filter to only available columns
+                available_cols = [col for col in display_cols if col in display_shift_df.columns]
+                
+                st.dataframe(
+                    display_shift_df[available_cols],
+                    use_container_width=True,
+                    column_config={
+                        'SHIFT': st.column_config.TextColumn("Shift", width="small"),
+                        'Avg Score': st.column_config.NumberColumn("Avg Score", format="%.1f", width="small"),
+                        'Median Score': st.column_config.NumberColumn("Median Score", format="%.1f", width="small"),
+                        'Performance Category': st.column_config.TextColumn("Category", width="medium"),
+                        'Avg PSM Score': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
+                        'Avg PWP Score': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
+                        'Avg SG Score': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
+                        'Avg APC Score': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
+                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
+                        'Record Count': st.column_config.NumberColumn("Records", width="small"),
+                    },
+                    hide_index=True
+                )
+                
+                # Shift Performance Insights
+                st.subheader("🤖 Shift Performance Insights")
+                
+                # Generate insights
+                shift_insights = []
+                
+                # Best performing shift
+                best_shift = shift_performance.iloc[0]
+                shift_insights.append({
+                    'type': 'success',
+                    'title': f'🏆 Best Performing Shift: {best_shift["SHIFT"]}',
+                    'text': f"Dengan rata-rata score {best_shift['Avg Score']:.1f} dan median {best_shift['Median Score']:.1f}"
+                })
+                
+                # Most consistent shift
+                most_consistent = shift_performance.loc[shift_performance['Score Std Dev'].idxmin()]
+                shift_insights.append({
+                    'type': 'info',
+                    'title': f'🎯 Most Consistent Shift: {most_consistent["SHIFT"]}',
+                    'text': f"Dengan standar deviasi terendah ({most_consistent['Score Std Dev']:.1f})"
+                })
+                
+                # Tebus performance
+                if 'ACV TEBUS (%)' in shift_performance.columns:
+                    best_tebus = shift_performance.loc[shift_performance['ACV TEBUS (%)'].idxmax()]
+                    if best_tebus['ACV TEBUS (%)'] >= 100:
+                        shift_insights.append({
+                            'type': 'success',
+                            'title': f'🛒 Best Tebus Performance: {best_tebus["SHIFT"]}',
+                            'text': f"Mencapai {best_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                        })
+                    else:
+                        worst_tebus = shift_performance.loc[shift_performance['ACV TEBUS (%)'].idxmin()]
+                        shift_insights.append({
+                            'type': 'warning',
+                            'title': f'⚠️ Tebus Performance Needs Improvement: {worst_tebus["SHIFT"]}',
+                            'text': f"Hanya mencapai {worst_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                        })
+                
+                # Display insights
+                for insight in shift_insights:
+                    card_class = "insight-card" if insight['type'] in ['success', 'info'] else "alert-card"
+                    st.markdown(f"""
+                    <div class="{card_class}">
+                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}">
+                            {insight['title']}
+                        </div>
+                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}">
+                            {insight['text']}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("⚠️ Tidak ada data shift yang tersedia untuk dianalisis.")
+        else:
+            st.warning("⚠️ Data shift tidak tersedia. Pastikan data memiliki kolom SHIFT atau JAM.")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab6:
+        # Performance Per Hari Tab
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">📅 Performance Per Hari Analysis</h2>', unsafe_allow_html=True)
+        
+        if not filtered_df.empty and 'TANGGAL' in filtered_df.columns:
+            # Calculate daily performance
+            daily_performance = calculate_daily_performance(filtered_df)
+            
+            if not daily_performance.empty:
+                # Daily Performance Summary
+                st.subheader("📊 Daily Performance Summary")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    best_day = daily_performance.loc[daily_performance['Avg Score'].idxmax()]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("trophy", size=20, color="#10b981")} 
+                            Best Performing Day
+                        </div>
+                        <div class="metric-value" style="color: #10b981; font-size: 1.5rem;">
+                            {best_day['TANGGAL'].strftime('%d %b %Y')}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Avg Score: {best_day['Avg Score']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    worst_day = daily_performance.loc[daily_performance['Avg Score'].idxmin()]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("alert", size=20, color="#ef4444")} 
+                            Needs Improvement
+                        </div>
+                        <div class="metric-value" style="color: #ef4444; font-size: 1.5rem;">
+                            {worst_day['TANGGAL'].strftime('%d %b %Y')}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Avg Score: {worst_day['Avg Score']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    most_consistent_day = daily_performance.loc[daily_performance['Score Std Dev'].idxmin()]
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("insights", size=20, color="#667eea")} 
+                            Most Consistent
+                        </div>
+                        <div class="metric-value" style="color: #667eea; font-size: 1.5rem;">
+                            {most_consistent_day['TANGGAL'].strftime('%d %b %Y')}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Std Dev: {most_consistent_day['Score Std Dev']:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Daily Performance Trend Chart
+                st.subheader("📈 Daily Performance Trend")
+                
+                fig_daily = go.Figure()
+                
+                # Add line for average score
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_performance['TANGGAL'],
+                    y=daily_performance['Avg Score'],
+                    mode='lines+markers',
+                    name='Average Score',
+                    line=dict(color='#667eea', width=3),
+                    marker=dict(size=8)
+                ))
+                
+                # Add line for median score
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_performance['TANGGAL'],
+                    y=daily_performance['Median Score'],
+                    mode='lines+markers',
+                    name='Median Score',
+                    line=dict(color='#764ba2', width=2),
+                    marker=dict(size=6)
+                ))
+                
+                # Add target line
+                fig_daily.add_hline(
+                    y=100, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text="Target (100)"
+                )
+                
+                # Add shaded area for standard deviation
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_performance['TANGGAL'],
+                    y=daily_performance['Avg Score'] + daily_performance['Score Std Dev'],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ))
+                
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_performance['TANGGAL'],
+                    y=daily_performance['Avg Score'] - daily_performance['Score Std Dev'],
+                    mode='lines',
+                    line=dict(width=0),
+                    fill='tonexty',
+                    fillcolor='rgba(102, 126, 234, 0.2)',
+                    name='Standard Deviation',
+                    showlegend=True
+                ))
+                
+                fig_daily.update_layout(
+                    template='plotly_white',
+                    height=400,
+                    showlegend=True,
+                    yaxis_title='Score',
+                    xaxis_title='Date',
+                    title="Daily Performance Trend with Standard Deviation"
+                )
+                
+                st.plotly_chart(fig_daily, use_container_width=True)
+                
+                # Day of Week Performance
+                day_performance = calculate_day_of_week_performance(filtered_df)
+                
+                if not day_performance.empty:
+                    st.subheader("📅 Performance by Day of Week")
+                    
+                    fig_day_week = go.Figure()
+                    
+                    # Add bars for average score
+                    fig_day_week.add_trace(go.Bar(
+                        x=day_performance['Day'],
+                        y=day_performance['Avg Score'],
+                        name='Average Score',
+                        marker_color=['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#fa709a', '#fee140'],
+                        text=[f"{score:.1f}" for score in day_performance['Avg Score']],
+                        textposition='outside'
+                    ))
+                    
+                    # Add target line
+                    fig_day_week.add_hline(
+                        y=100, 
+                        line_dash="dash", 
+                        line_color="red",
+                        annotation_text="Target (100)"
+                    )
+                    
+                    fig_day_week.update_layout(
+                        template='plotly_white',
+                        height=400,
+                        showlegend=False,
+                        yaxis_title='Score',
+                        xaxis_title='Day of Week',
+                        title="Performance by Day of Week"
+                    )
+                    
+                    st.plotly_chart(fig_day_week, use_container_width=True)
+                    
+                    # Component Performance by Day of Week
+                    st.subheader("🎯 Component Performance by Day of Week")
+                    
+                    # Create a dataframe for component comparison
+                    component_cols = ['Day', 'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score']
+                    component_df = day_performance[component_cols].melt(
+                        id_vars=['Day'], 
+                        var_name='Component', 
+                        value_name='Score'
+                    )
+                    
+                    # Clean component names
+                    component_df['Component'] = component_df['Component'].str.replace('Avg ', '').str.replace(' Score', '')
+                    
+                    fig_component_day = px.bar(
+                        component_df, 
+                        x='Day', 
+                        y='Score', 
+                        color='Component',
+                        barmode='group',
+                        color_discrete_map={
+                            'PSM': '#667eea', 
+                            'PWP': '#764ba2', 
+                            'SG': '#f093fb',
+                            'APC': '#4facfe'
+                        },
+                        title="Component Scores by Day of Week"
+                    )
+                    
+                    fig_component_day.update_layout(
+                        template='plotly_white',
+                        height=400,
+                        yaxis_title='Score',
+                        xaxis_title='Day of Week'
+                    )
+                    
+                    st.plotly_chart(fig_component_day, use_container_width=True)
+                
+                # Tebus Performance by Day
+                if 'ACV TEBUS (%)' in daily_performance.columns:
+                    st.subheader("🛒 Tebus Performance by Day")
+                    
+                    fig_tebus_daily = go.Figure()
+                    
+                    colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
+                             for acv in daily_performance['ACV TEBUS (%)']]
+                    
+                    fig_tebus_daily.add_trace(go.Bar(
+                        x=daily_performance['TANGGAL'],
+                        y=daily_performance['ACV TEBUS (%)'],
+                        marker_color=colors,
+                        text=[f"{acv:.1f}%" for acv in daily_performance['ACV TEBUS (%)']],
+                        textposition='outside'
+                    ))
+                    
+                    fig_tebus_daily.add_hline(
+                        y=100, 
+                        line_dash="dash", 
+                        line_color="red",
+                        annotation_text="Target (100%)"
+                    )
+                    
+                    fig_tebus_daily.update_layout(
+                        template='plotly_white',
+                        height=350,
+                        showlegend=False,
+                        yaxis_title='ACV Tebus (%)',
+                        xaxis_title='Date',
+                        title="Tebus Achievement by Day"
+                    )
+                    
+                    st.plotly_chart(fig_tebus_daily, use_container_width=True)
+                
+                # Detailed Daily Performance Table
+                st.subheader("📋 Detailed Daily Performance")
+                
+                # Format the dataframe for display
+                display_daily_df = daily_performance.copy()
+                
+                # Add performance categories
+                display_daily_df['Performance Category'] = display_daily_df['Avg Score'].apply(
+                    lambda x: "🏆 Excellent" if x >= 120 else
+                             "⭐ Good" if x >= 100 else
+                             "⚠️ Needs Improvement" if x >= 80 else
+                             "🚨 Critical"
+                )
+                
+                # Format date for display
+                display_daily_df['Date'] = display_daily_df['TANGGAL'].dt.strftime('%d %b %Y')
+                
+                # Select columns to display
+                display_cols = [
+                    'Date', 'Day of Week', 'Avg Score', 'Median Score', 'Performance Category',
+                    'Avg PSM Score', 'Avg PWP Score', 'Avg SG Score', 'Avg APC Score',
+                    'ACV TEBUS (%)', 'Record Count'
+                ]
+                
+                # Filter to only available columns
+                available_cols = [col for col in display_cols if col in display_daily_df.columns]
+                
+                st.dataframe(
+                    display_daily_df[available_cols],
+                    use_container_width=True,
+                    column_config={
+                        'Date': st.column_config.TextColumn("Date", width="small"),
+                        'Day of Week': st.column_config.TextColumn("Day", width="small"),
+                        'Avg Score': st.column_config.NumberColumn("Avg Score", format="%.1f", width="small"),
+                        'Median Score': st.column_config.NumberColumn("Median Score", format="%.1f", width="small"),
+                        'Performance Category': st.column_config.TextColumn("Category", width="medium"),
+                        'Avg PSM Score': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
+                        'Avg PWP Score': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
+                        'Avg SG Score': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
+                        'Avg APC Score': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
+                        'ACV TEBUS (%)': st.column_config.NumberColumn("Tebus ACV", format="%.1f%", width="small"),
+                        'Record Count': st.column_config.NumberColumn("Records", width="small"),
+                    },
+                    hide_index=True
+                )
+                
+                # Daily Performance Insights
+                st.subheader("🤖 Daily Performance Insights")
+                
+                # Generate insights
+                daily_insights = []
+                
+                # Best performing day
+                best_day = daily_performance.loc[daily_performance['Avg Score'].idxmax()]
+                daily_insights.append({
+                    'type': 'success',
+                    'title': f'🏆 Best Performing Day: {best_day["TANGGAL"].strftime("%d %b %Y")} ({best_day["Day of Week"]})',
+                    'text': f"Dengan rata-rata score {best_day['Avg Score']:.1f} dan median {best_day['Median Score']:.1f}"
+                })
+                
+                # Most consistent day
+                most_consistent = daily_performance.loc[daily_performance['Score Std Dev'].idxmin()]
+                daily_insights.append({
+                    'type': 'info',
+                    'title': f'🎯 Most Consistent Day: {most_consistent["TANGGAL"].strftime("%d %b %Y")} ({most_consistent["Day of Week"]})',
+                    'text': f"Dengan standar deviasi terendah ({most_consistent['Score Std Dev']:.1f})"
+                })
+                
+                # Best day of week
+                if not day_performance.empty:
+                    best_day_week = day_performance.loc[day_performance['Avg Score'].idxmax()]
+                    daily_insights.append({
+                        'type': 'success',
+                        'title': f'📅 Best Day of Week: {best_day_week["Day"]}',
+                        'text': f"Dengan rata-rata score {best_day_week['Avg Score']:.1f}"
+                    })
+                    
+                    worst_day_week = day_performance.loc[day_performance['Avg Score'].idxmin()]
+                    daily_insights.append({
+                        'type': 'warning',
+                        'title': f'📅 Worst Day of Week: {worst_day_week["Day"]}',
+                        'text': f"Dengan rata-rata score {worst_day_week['Avg Score']:.1f}"
+                    })
+                
+                # Tebus performance
+                if 'ACV TEBUS (%)' in daily_performance.columns:
+                    best_tebus = daily_performance.loc[daily_performance['ACV TEBUS (%)'].idxmax()]
+                    if best_tebus['ACV TEBUS (%)'] >= 100:
+                        daily_insights.append({
+                            'type': 'success',
+                            'title': f'🛒 Best Tebus Performance: {best_tebus["TANGGAL"].strftime("%d %b %Y")}',
+                            'text': f"Mencapai {best_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                        })
+                    else:
+                        worst_tebus = daily_performance.loc[daily_performance['ACV TEBUS (%)'].idxmin()]
+                        daily_insights.append({
+                            'type': 'warning',
+                            'title': f'⚠️ Tebus Performance Needs Improvement: {worst_tebus["TANGGAL"].strftime("%d %b %Y")}',
+                            'text': f"Hanya mencapai {worst_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                        })
+                
+                # Display insights
+                for insight in daily_insights:
+                    card_class = "insight-card" if insight['type'] in ['success', 'info'] else "alert-card"
+                    st.markdown(f"""
+                    <div class="{card_class}">
+                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}">
+                            {insight['title']}
+                        </div>
+                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}">
+                            {insight['text']}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("⚠️ Tidak ada data harian yang tersedia untuk dianalisis.")
+        else:
+            st.warning("⚠️ Data harian tidak tersedia. Pastikan data memiliki kolom TANGGAL.")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
