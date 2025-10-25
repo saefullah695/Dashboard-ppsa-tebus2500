@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
+import time
 warnings.filterwarnings('ignore')
 
 # --- KONFIGURASI HALAMAN ---
@@ -44,7 +45,9 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "growth": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="{color}"/></svg>',
         "analytics": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>',
         "store": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v2c0 1.1.9 2 2 2h2v9h2v-9h4v9h2v-9h2c1.1 0 2-.9 2-2V7l-10-5z" fill="{color}"/></svg>',
-        "medal": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-8c0 1.1.9 2 2 2s2-.9 2-2-.9-2-2-2-2 .9-2 2z" fill="{color}"/></svg>'
+        "medal": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-8c0 1.1.9 2 2 2s2-.9 2-2-.9-2-2-2z" fill="{color}"/></svg>',
+        "refresh": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="{color}"/></svg>',
+        "clock": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="{color}"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -138,6 +141,47 @@ st.markdown("""
     max-width: 900px;
     margin: 0 auto;
     animation: fadeInUp 0.8s ease-out 0.2s both;
+}
+
+/* REFRESH BUTTON AND LAST UPDATE */
+.refresh-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-sm);
+}
+
+.last-update {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.refresh-button {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.refresh-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 /* METRIC CARDS */
@@ -473,6 +517,11 @@ st.markdown("""
     
     .content-container {
         padding: 1.5rem;
+    }
+    
+    .refresh-container {
+        flex-direction: column;
+        gap: 0.5rem;
     }
 }
 </style>
@@ -1099,6 +1148,33 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # PERBAIKAN: Tambahkan tombol refresh dan indikator waktu update
+    # Initialize session state for last update time
+    if 'last_update' not in st.session_state:
+        st.session_state.last_update = datetime.now()
+    
+    # Add refresh button and last update indicator
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button(
+            "Refresh Data", 
+            key="refresh_button",
+            help="Klik untuk memuat ulang data dari Google Sheets",
+            icon=get_svg_icon("refresh", size=16, color="white")
+        ):
+            # Clear cache to force data refresh
+            st.cache_data.clear()
+            st.session_state.last_update = datetime.now()
+            st.rerun()
+    
+    with col2:
+        st.markdown(f"""
+        <div class="last-update">
+            {get_svg_icon("clock", size=16, color="#64748b")}
+            Last Updated: {st.session_state.last_update.strftime('%d %b %Y, %H:%M:%S')}
+        </div>
+        """, unsafe_allow_html=True)
+
     # Load and process data
     raw_df = load_data_from_gsheet()
     
@@ -1107,6 +1183,9 @@ def main():
         return
 
     processed_df = process_data(raw_df.copy())
+    
+    # Update last update time when data is successfully loaded
+    st.session_state.last_update = datetime.now()
     
     # Sidebar filters
     with st.sidebar:
@@ -2771,7 +2850,7 @@ def main():
                         'SCORE PSM': st.column_config.NumberColumn("PSM", format="%.1f", width="small"),
                         'SCORE PWP': st.column_config.NumberColumn("PWP", format="%.1f", width="small"),
                         'SCORE SG': st.column_config.NumberColumn("SG", format="%.1f", width="small"),
-                        'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
+                        'SCORE APC': st.column_config.NumberColumn("APC", format="%.2f", width="small"),
                         'ACV TEBUS FORMATTED': st.column_config.TextColumn("Tebus ACV", width="small"),  # PERBAIKAN: Gunakan TextColumn
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
