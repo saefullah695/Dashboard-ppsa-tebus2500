@@ -499,22 +499,26 @@ def process_data(df):
             'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu', 'Sunday': 'Minggu'
         }
         df['HARI'] = df['HARI'].map(hari_map)
+    
+    # Process shift column - PERBAIKAN UTAMA
+    if 'shift' in df.columns:
+        # Convert shift to numeric if it's not already
+        df['shift'] = pd.to_numeric(df['shift'], errors='coerce')
         
-        # Extract hour for shift analysis
-        if 'JAM' in df.columns:
-            df['JAM'] = pd.to_numeric(df['JAM'], errors='coerce')
-            # Define shifts based on hour
-            conditions = [
-                (df['JAM'] >= 6) & (df['JAM'] < 14),
-                (df['JAM'] >= 14) & (df['JAM'] < 22),
-                (df['JAM'] >= 22) | (df['JAM'] < 6)
-            ]
-            choices = ['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)']
-            df['SHIFT'] = np.select(conditions, choices, default='Unknown')
-        else:
-            # If no hour column, create a default shift based on random assignment for demo
-            np.random.seed(42)
-            df['SHIFT'] = np.random.choice(['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)'], size=len(df))
+        # Map shift values to meaningful names
+        shift_map = {
+            1: 'Shift 1 (Pagi)',
+            2: 'Shift 2 (Siang)',
+            3: 'Shift 3 (Malam)'
+        }
+        df['SHIFT'] = df['shift'].map(shift_map)
+        
+        # Handle any unmapped values
+        df['SHIFT'] = df['SHIFT'].fillna('Unknown')
+    else:
+        # If no shift column, create a default shift based on random assignment for demo
+        np.random.seed(42)
+        df['SHIFT'] = np.random.choice(['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)'], size=len(df))
 
     # Process numeric columns
     numeric_cols = [
@@ -552,14 +556,18 @@ def process_data(df):
     return df
 
 def calculate_overall_ppsa_breakdown(df):
-    """Calculate overall PPSA breakdown dengan weights standar"""
+    """
+    Calculate overall PPSA breakdown dengan metode yang benar:
+    - PSM, PWP, SG: Menggunakan SUM (kumulatif)
+    - APC: Menggunakan AVERAGE (rata-rata)
+    """
     if df.empty:
         return {'total': 0.0, 'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
     
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     scores = {'psm': 0.0, 'pwp': 0.0, 'sg': 0.0, 'apc': 0.0}
     
-    # For PSM, PWP, SG - use sum aggregation
+    # For PSM, PWP, SG - use SUM aggregation (metrik kumulatif)
     for comp in ['PSM', 'PWP', 'SG']:
         total_target = df[f'{comp} Target'].sum()
         total_actual = df[f'{comp} Actual'].sum()
@@ -567,30 +575,36 @@ def calculate_overall_ppsa_breakdown(df):
             acv = (total_actual / total_target) * 100
             scores[comp.lower()] = (acv * weights[comp]) / 100
     
-    # For APC - use average
+    # For APC - use AVERAGE aggregation (metrik rata-rata)
     avg_target_apc = df['APC Target'].mean()
     avg_actual_apc = df['APC Actual'].mean()
     if avg_target_apc > 0:
         acv_apc = (avg_actual_apc / avg_target_apc) * 100
-        scores['apc'] = (acv_apc * weights['APC']) / 100  # Fixed typo here
+        scores['apc'] = (acv_apc * weights['APC']) / 100
     
     scores['total'] = sum(scores.values())
     return scores
 
 def calculate_aggregate_scores_per_cashier(df):
-    """Calculate aggregate scores per cashier"""
+    """
+    Calculate aggregate scores per cashier dengan metode yang benar:
+    - PSM, PWP, SG: Menggunakan SUM (kumulatif)
+    - APC: Menggunakan AVERAGE (rata-rata)
+    """
     if df.empty or 'NAMA KASIR' not in df.columns:
         return pd.DataFrame()
     
     weights = {'PSM': 20, 'PWP': 25, 'SG': 30, 'APC': 25}
     
+    # Define aggregation methods for each component
     agg_cols = {
         'PSM Target': 'sum', 'PSM Actual': 'sum',
         'PWP Target': 'sum', 'PWP Actual': 'sum',
         'SG Target': 'sum', 'SG Actual': 'sum',
-        'APC Target': 'mean', 'APC Actual': 'mean'
+        'APC Target': 'mean', 'APC Actual': 'mean'  # APC menggunakan mean
     }
     
+    # Filter only available columns
     valid_agg_cols = {col: func for col, func in agg_cols.items() if col in df.columns}
     aggregated_df = df.groupby('NAMA KASIR')[list(valid_agg_cols.keys())].agg(valid_agg_cols).reset_index()
 
@@ -602,20 +616,25 @@ def calculate_aggregate_scores_per_cashier(df):
         acv = (total_actual / total_target) * 100
         return (acv * weights[comp]) / 100
 
+    # Calculate scores for each component
     for comp in ['PSM', 'PWP', 'SG', 'APC']:
-        aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(
-            lambda row: calculate_score_from_agg(row, comp), axis=1
-        )
+        if f'{comp} Target' in aggregated_df.columns and f'{comp} Actual' in aggregated_df.columns:
+            aggregated_df[f'SCORE {comp}'] = aggregated_df.apply(
+                lambda row: calculate_score_from_agg(row, comp), axis=1
+            )
     
-    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC']]
-    aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
+    # Calculate total score
+    score_cols = [f'SCORE {comp}' for comp in ['PSM', 'PWP', 'SG', 'APC'] 
+                 if f'SCORE {comp}' in aggregated_df.columns]
+    if score_cols:
+        aggregated_df['TOTAL SCORE PPSA'] = aggregated_df[score_cols].sum(axis=1)
     
     # Add performance consistency metrics
-    individual_scores = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].agg(['std', 'count']).reset_index()
-    individual_scores.columns = ['NAMA KASIR', 'SCORE_STD', 'RECORD_COUNT']
-    
-    aggregated_df = aggregated_df.merge(individual_scores, on='NAMA KASIR', how='left')
-    aggregated_df['CONSISTENCY'] = aggregated_df['SCORE_STD'].fillna(0)
+    if 'TOTAL SCORE PPSA' in df.columns:
+        individual_scores = df.groupby('NAMA KASIR')['TOTAL SCORE PPSA'].agg(['std', 'count']).reset_index()
+        individual_scores.columns = ['NAMA KASIR', 'SCORE_STD', 'RECORD_COUNT']
+        aggregated_df = aggregated_df.merge(individual_scores, on='NAMA KASIR', how='left')
+        aggregated_df['CONSISTENCY'] = aggregated_df['SCORE_STD'].fillna(0)
     
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
@@ -1039,7 +1058,7 @@ def main():
                     mask = (filtered_df['TANGGAL'] >= start_date) & (filtered_df['TANGGAL'] <= end_date)
                     filtered_df = filtered_df.loc[mask]
         
-        # Shift filter
+        # Shift filter - PERBAIKAN: Menggunakan kolom SHIFT yang sudah diproses
         if 'SHIFT' in filtered_df.columns:
             all_shifts = sorted(filtered_df['SHIFT'].unique())
             selected_shifts = st.multiselect(
@@ -1280,6 +1299,44 @@ def main():
                 </div>
             </div>
             """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Penjelasan Metode Perhitungan
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">📐 Metode Perhitungan PPSA</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            ### 📊 Komponen Kumulatif (SUM)
+            **PSM, PWP, SG** menggunakan metode SUM karena:
+            - Merupakan metrik kumulatif/akumulasi
+            - Semakin besar nilai semakin baik
+            - Total performa dari seluruh transaksi
+            
+            **Formula:**
+            ```
+            ACV = (Total Actual / Total Target) × 100
+            Score = (ACV × Bobot) / 100
+            ```
+            """)
+        
+        with col2:
+            st.markdown("""
+            ### 📈 Komponen Rata-rata (AVERAGE)
+            **APC** menggunakan metode AVERAGE karena:
+            - Merupakan metrik rata-rata per transaksi
+            - Konsistensi lebih penting dari total
+            - Mengukur efisiensi per customer
+            
+            **Formula:**
+            ```
+            ACV = (Avg Actual / Avg Target) × 100
+            Score = (ACV × Bobot) / 100
+            ```
+            """)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2212,7 +2269,7 @@ def main():
             else:
                 st.warning("⚠️ Tidak ada data shift yang tersedia untuk dianalisis.")
         else:
-            st.warning("⚠️ Data shift tidak tersedia. Pastikan data memiliki kolom SHIFT atau JAM.")
+            st.warning("⚠️ Data shift tidak tersedia. Pastikan data memiliki kolom SHIFT.")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2562,10 +2619,10 @@ def main():
                     card_class = "insight-card" if insight['type'] in ['success', 'info'] else "alert-card"
                     st.markdown(f"""
                     <div class="{card_class}">
-                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}>
+                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}">
                             {insight['title']}
                         </div>
-                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}>
+                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}">
                             {insight['text']}
                         </div>
                     </div>
