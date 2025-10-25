@@ -42,7 +42,9 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "target": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="{color}"/></svg>',
         "chart": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z" fill="{color}"/></svg>',
         "growth": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="{color}"/></svg>',
-        "analytics": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>'
+        "analytics": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>',
+        "store": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7v2c0 1.1.9 2 2 2h2v9h2v-9h4v9h2v-9h2c1.1 0 2-.9 2-2V7l-10-5z" fill="{color}"/></svg>',
+        "medal": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-8c0 1.1.9 2 2 2s2-.9 2-2-.9-2-2-2-2 .9-2 2z" fill="{color}"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -108,13 +110,24 @@ st.markdown("""
     -webkit-text-fill-color: transparent;
     background-clip: text;
     font-weight: 800;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     letter-spacing: -1px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 1rem;
     animation: slideInFromTop 0.8s ease-out;
+}
+
+.store-name {
+    font-size: 1.8rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .subtitle {
@@ -448,6 +461,10 @@ st.markdown("""
         font-size: 2.5rem;
         flex-direction: column;
         gap: 0.5rem;
+    }
+    
+    .store-name {
+        font-size: 1.4rem;
     }
     
     .metric-card {
@@ -1063,13 +1080,17 @@ def calculate_tebus_insights(df):
 
 # --- MAIN DASHBOARD ---
 def main():
-    # Dashboard Header
+    # Dashboard Header - PERBAIKAN: Tambahkan nama toko
     st.markdown(f"""
     <div class="dashboard-header">
         <h1 class="main-title">
             {get_svg_icon("dashboard", size=60, color="#667eea")}
             PPSA Analytics Dashboard
         </h1>
+        <div class="store-name">
+            {get_svg_icon("store", size=24, color="#764ba2")}
+            2GC6 BAROS PANDEGLANG
+        </div>
         <p class="subtitle">
             Platform <strong>analytics</strong> komprehensif untuk monitoring real-time 
             performa <strong>PPSA</strong> (PSM, PWP, SG, APC) dan <strong>Tebus Suuegerr</strong> 
@@ -1596,6 +1617,33 @@ def main():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            # PERBAIKAN: Tambahkan Top 3 Tebus Performers
+            st.subheader("🏆 Top 3 Tebus Performers")
+            if not tebus_summary.empty and len(tebus_summary) >= 3:
+                top3_tebus = tebus_summary.head(3)
+                medal_icons = ["gold", "silver", "bronze"]
+                medal_colors = ["#FFD700", "#C0C0C0", "#CD7F32"]
+                
+                col1, col2, col3 = st.columns(3, gap="medium")
+                
+                for i, (col, performer, medal, color) in enumerate(zip([col1, col2, col3], top3_tebus.iterrows(), medal_icons, medal_colors)):
+                    idx, row = performer
+                    
+                    with col:
+                        st.markdown(f"""
+                        <div class="top-performer-card" style="border-top: 4px solid {color};">
+                            <div class="top-performer-icon">{get_svg_icon(medal, size=80)}</div>
+                            <div class="top-performer-name">{row['NAMA KASIR']}</div>
+                            <div class="top-performer-score">{row['ACV TEBUS (%)']:.1f}%</div>
+                            <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.5rem;">
+                                Target: {row['TARGET TEBUS 2500']:,}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b;">
+                                Actual: {row['ACTUAL TEBUS 2500']:,}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
             
             # Tebus Performance by Shift
             st.subheader("🕐 Tebus Performance by Shift")
