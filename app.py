@@ -133,7 +133,6 @@ def calculate_overall_ppsa_breakdown(df):
     scores['total'] = sum(scores.values())
     return scores
 
-# --- PERBAIKAN: INDENTASI FUNGSI AGREGASI ---
 def calculate_aggregate_scores_per_cashier(df):
     if df.empty or 'NAMA KASIR' not in df.columns:
         return pd.DataFrame()
@@ -163,7 +162,6 @@ def calculate_aggregate_scores_per_cashier(df):
     
     return aggregated_df.sort_values(by='TOTAL SCORE PPSA', ascending=False).reset_index(drop=True)
 
-# --- PERBAIKAN: INDENTASI FUNGSI AGREGASI SHIFT ---
 def calculate_aggregate_scores_per_shift(df):
     if df.empty or 'SHIFT' not in df.columns:
         return pd.DataFrame()
@@ -241,7 +239,6 @@ def calculate_gap_per_cashier(df):
     if df.empty or 'NAMA KASIR' not in df.columns:
         return pd.DataFrame()
     
-    # Gunakan fungsi yang sudah ada untuk menghitung skor
     score_summary = calculate_aggregate_scores_per_cashier(df)
     
     if score_summary.empty:
@@ -359,9 +356,49 @@ if not raw_df.empty:
             st.plotly_chart(fig_gap_cashier, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # --- TAMBAHAN: SECTION TOP & FLOP PERFORMANCE ---
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">🥇📉 Top & Flop Performance</h2>', unsafe_allow_html=True)
+        
+        score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
+        if not score_summary.empty:
+            top_col, flop_col = st.columns(2, gap="large")
+            
+            with top_col:
+                st.markdown("##### 🥇 Top 5 Performers (Skor Tertinggi)")
+                top_performers = score_summary.head(5).copy()
+                top_performers['Ranking'] = range(1, len(top_performers) + 1)
+                
+                top_config = {
+                    'Ranking': st.column_config.NumberColumn("Ranking", width="small"),
+                    'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
+                    'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Skor", format="%.2f", width="medium"),
+                    'SCORE PSM': st.column_config.NumberColumn("Skor PSM", format="%.2f"),
+                    'SCORE PWP': st.column_config.NumberColumn("Skor PWP", format="%.2f"),
+                    'SCORE SG': st.column_config.NumberColumn("Skor SG", format="%.2f"),
+                    'SCORE APC': st.column_config.NumberColumn("Skor APC", format="%.2f"),
+                }
+                st.dataframe(top_performers, use_container_width=True, column_config=top_config, hide_index=True)
+
+            with flop_col:
+                st.markdown("##### 📉 5 Performers Terendah (Perlu Perhatian)")
+                flop_performers = score_summary.tail(5).sort_values(by='TOTAL SCORE PPSA', ascending=True).copy()
+                flop_performers['Ranking'] = range(len(score_summary), len(score_summary) - len(flop_performers), -1, -1)
+                
+                flop_config = {
+                    'Ranking': st.column_config.NumberColumn("Ranking", width="small"),
+                    'NAMA KASIR': st.column_config.TextColumn("Nama Kasir", width="large"),
+                    'TOTAL SCORE PPSA': st.column_config.NumberColumn("Total Skor", format="%.2f", width="medium"),
+                    'SCORE PSM': st.column_config.NumberColumn("Skor PSM", format="%.2f"),
+                    'SCORE PWP': st.column_config.NumberColumn("Skor PWP", format="%.2f"),
+                    'SCORE SG': st.column_config.NumberColumn("Skor SG", format="%.2f"),
+                    'SCORE APC': st.column_config.NumberColumn("Skor APC", format="%.2f"),
+                }
+                st.dataframe(flop_performers, use_container_width=True, column_config=flop_config, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🔍 Analisa Mendalam PPSA</h2>', unsafe_allow_html=True)
-        score_summary = calculate_aggregate_scores_per_cashier(filtered_df)
         if not score_summary.empty:
             top_cashiers = score_summary.head(5)
             fig_breakdown = go.Figure()
