@@ -35,7 +35,14 @@ def get_svg_icon(icon_name, size=24, color="#667eea"):
         "insights": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 11H7v9h2v-9zm4-4h-2v13h2V7zm4-4h-2v17h2V3z" fill="{color}"/></svg>',
         "correlation": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>',
         "shift": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="{color}"/></svg>',
-        "calendar": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="{color}"/></svg>'
+        "calendar": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="{color}"/></svg>',
+        "users": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="{color}"/></svg>',
+        "trending": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="{color}"/></svg>',
+        "star": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="{color}"/></svg>',
+        "target": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="{color}"/></svg>',
+        "chart": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z" fill="{color}"/></svg>',
+        "growth": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="{color}"/></svg>',
+        "analytics": f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="{color}"/></svg>'
     }
     return icons.get(icon_name, "")
 
@@ -835,6 +842,139 @@ def calculate_day_of_week_performance(df):
     
     return day_performance
 
+def calculate_team_metrics(df):
+    """Calculate team-wide metrics for display"""
+    if df.empty:
+        return {}
+    
+    metrics = {}
+    
+    # Total records
+    metrics['total_records'] = len(df)
+    
+    # Unique cashiers
+    if 'NAMA KASIR' in df.columns:
+        metrics['unique_cashiers'] = df['NAMA KASIR'].nunique()
+    else:
+        metrics['unique_cashiers'] = 0
+    
+    # Performance metrics
+    metrics['avg_score'] = df['TOTAL SCORE PPSA'].mean()
+    metrics['median_score'] = df['TOTAL SCORE PPSA'].median()
+    metrics['max_score'] = df['TOTAL SCORE PPSA'].max()
+    metrics['min_score'] = df['TOTAL SCORE PPSA'].min()
+    
+    # Achievement rates
+    metrics['above_target'] = (df['TOTAL SCORE PPSA'] >= 100).sum()
+    metrics['below_target'] = (df['TOTAL SCORE PPSA'] < 100).sum()
+    metrics['achievement_rate'] = (metrics['above_target'] / metrics['total_records']) * 100
+    
+    # Component performance
+    components = ['PSM', 'PWP', 'SG', 'APC']
+    for comp in components:
+        if f'SCORE {comp}' in df.columns:
+            metrics[f'avg_{comp.lower()}_score'] = df[f'SCORE {comp}'].mean()
+    
+    # Tebus performance
+    if 'ACTUAL TEBUS 2500' in df.columns and 'TARGET TEBUS 2500' in df.columns:
+        total_target = df['TARGET TEBUS 2500'].sum()
+        total_actual = df['ACTUAL TEBUS 2500'].sum()
+        metrics['tebus_acv'] = (total_actual / total_target * 100) if total_target > 0 else 0
+    
+    return metrics
+
+def calculate_tebus_insights(df):
+    """Generate insights specifically for Tebus performance"""
+    insights = []
+    
+    if df.empty:
+        return insights
+    
+    # Overall Tebus performance
+    total_target = df['TARGET TEBUS 2500'].sum()
+    total_actual = df['ACTUAL TEBUS 2500'].sum()
+    overall_acv = (total_actual / total_target * 100) if total_target > 0 else 0
+    
+    if overall_acv >= 100:
+        insights.append({
+            'type': 'success',
+            'title': '🎉 Target Tebus Tercapai!',
+            'text': f"Total ACV Tebus {overall_acv:.1f}% telah melampaui target 100%."
+        })
+    else:
+        gap = 100 - overall_acv
+        insights.append({
+            'type': 'warning',
+            'title': '⚠️ Gap Tebus Performance',
+            'text': f"Masih kurang {gap:.1f}% untuk mencapai target. Perlu peningkatan performa."
+        })
+    
+    # Top Tebus performers
+    if 'NAMA KASIR' in df.columns:
+        tebus_summary = df.groupby('NAMA KASIR').agg({
+            'TARGET TEBUS 2500': 'sum',
+            'ACTUAL TEBUS 2500': 'sum'
+        }).reset_index()
+        
+        tebus_summary['ACV TEBUS (%)'] = (tebus_summary['ACTUAL TEBUS 2500'] / tebus_summary['TARGET TEBUS 2500'] * 100).fillna(0)
+        tebus_summary = tebus_summary.sort_values('ACV TEBUS (%)', ascending=False)
+        
+        if not tebus_summary.empty:
+            top_performer = tebus_summary.iloc[0]
+            insights.append({
+                'type': 'success',
+                'title': f'🌟 Top Tebus Performer: {top_performer["NAMA KASIR"]}',
+                'text': f"Dengan ACV {top_performer['ACV TEBUS (%)']:.1f}%"
+            })
+            
+            # Consistency analysis
+            if len(tebus_summary) > 1:
+                std_acv = tebus_summary['ACV TEBUS (%)'].std()
+                if std_acv < 10:
+                    insights.append({
+                        'type': 'info',
+                        'title': '📊 Performa Tebus Konsisten',
+                        'text': f"Standar deviasi ACV rendah ({std_acv:.1f}%) menunjukkan performa stabil."
+                    })
+    
+    # Shift performance for Tebus
+    if 'SHIFT' in df.columns:
+        shift_tebus = df.groupby('SHIFT').agg({
+            'TARGET TEBUS 2500': 'sum',
+            'ACTUAL TEBUS 2500': 'sum'
+        }).reset_index()
+        
+        shift_tebus['ACV TEBUS (%)'] = (shift_tebus['ACTUAL TEBUS 2500'] / shift_tebus['TARGET TEBUS 2500'] * 100).fillna(0)
+        shift_tebus = shift_tebus.sort_values('ACV TEBUS (%)', ascending=False)
+        
+        if not shift_tebus.empty:
+            best_shift = shift_tebus.iloc[0]
+            insights.append({
+                'type': 'info',
+                'title': f'🕐 Best Shift for Tebus: {best_shift["SHIFT"]}',
+                'text': f"Dengan ACV {best_shift['ACV TEBUS (%)']:.1f}%"
+            })
+    
+    # Day of week performance for Tebus
+    if 'HARI' in df.columns:
+        day_tebus = df.groupby('HARI').agg({
+            'TARGET TEBUS 2500': 'sum',
+            'ACTUAL TEBUS 2500': 'sum'
+        }).reset_index()
+        
+        day_tebus['ACV TEBUS (%)'] = (day_tebus['ACTUAL TEBUS 2500'] / day_tebus['TARGET TEBUS 2500'] * 100).fillna(0)
+        day_tebus = day_tebus.sort_values('ACV TEBUS (%)', ascending=False)
+        
+        if not day_tebus.empty:
+            best_day = day_tebus.iloc[0]
+            insights.append({
+                'type': 'info',
+                'title': f'📅 Best Day for Tebus: {best_day["HARI"]}',
+                'text': f"Dengan ACV {best_day['ACV TEBUS (%)']:.1f}%"
+            })
+    
+    return insights
+
 # --- MAIN DASHBOARD ---
 def main():
     # Dashboard Header
@@ -993,6 +1133,153 @@ def main():
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Team Performance Metrics Section
+        st.markdown('<div class="content-container">', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">👥 Team Performance Metrics</h2>', unsafe_allow_html=True)
+        
+        # Calculate team metrics
+        team_metrics = calculate_team_metrics(filtered_df)
+        
+        # Display team metrics in a grid
+        col1, col2, col3, col4 = st.columns(4, gap="medium")
+        
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("users", size=20, color="#667eea")} 
+                    Total Team Members
+                </div>
+                <div class="metric-value" style="color: #667eea; font-size: 2rem;">
+                    {team_metrics.get('unique_cashiers', 0)}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Active Members
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("trending", size=20, color="#10b981")} 
+                    Achievement Rate
+                </div>
+                <div class="metric-value" style="color: #10b981; font-size: 2rem;">
+                    {team_metrics.get('achievement_rate', 0):.1f}%
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Above Target
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("star", size=20, color="#f59e0b")} 
+                    Average Score
+                </div>
+                <div class="metric-value" style="color: #f59e0b; font-size: 2rem;">
+                    {team_metrics.get('avg_score', 0):.1f}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Team Average
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("tebus", size=20, color="#764ba2")} 
+                    Tebus ACV
+                </div>
+                <div class="metric-value" style="color: #764ba2; font-size: 2rem;">
+                    {team_metrics.get('tebus_acv', 0):.1f}%
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Overall Achievement
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Additional team metrics in second row
+        col1, col2, col3, col4 = st.columns(4, gap="medium")
+        
+        with col1:
+            max_score = team_metrics.get('max_score', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("trophy", size=20, color="#FFD700")} 
+                    Highest Score
+                </div>
+                <div class="metric-value" style="color: #FFD700; font-size: 2rem;">
+                    {max_score:.1f}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Peak Performance
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            min_score = team_metrics.get('min_score', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("alert", size=20, color="#ef4444")} 
+                    Lowest Score
+                </div>
+                <div class="metric-value" style="color: #ef4444; font-size: 2rem;">
+                    {min_score:.1f}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Needs Attention
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            median_score = team_metrics.get('median_score', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("analytics", size=20, color="#667eea")} 
+                    Median Score
+                </div>
+                <div class="metric-value" style="color: #667eea; font-size: 2rem;">
+                    {median_score:.1f}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Center Point
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            total_records = team_metrics.get('total_records', 0)
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">
+                    {get_svg_icon("chart", size=20, color="#764ba2")} 
+                    Total Records
+                </div>
+                <div class="metric-value" style="color: #764ba2; font-size: 2rem;">
+                    {total_records:,}
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                    Data Points
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1186,7 +1473,156 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
+            # Tebus Performance by Shift
+            st.subheader("🕐 Tebus Performance by Shift")
+            if 'SHIFT' in filtered_df.columns:
+                shift_tebus = filtered_df.groupby('SHIFT').agg({
+                    'TARGET TEBUS 2500': 'sum',
+                    'ACTUAL TEBUS 2500': 'sum'
+                }).reset_index()
+                
+                shift_tebus['ACV TEBUS (%)'] = (shift_tebus['ACTUAL TEBUS 2500'] / shift_tebus['TARGET TEBUS 2500'] * 100).fillna(0)
+                shift_tebus = shift_tebus.sort_values('ACV TEBUS (%)', ascending=False)
+                
+                fig_shift_tebus = go.Figure()
+                colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
+                         for acv in shift_tebus['ACV TEBUS (%)']]
+                
+                fig_shift_tebus.add_trace(go.Bar(
+                    x=shift_tebus['SHIFT'],
+                    y=shift_tebus['ACV TEBUS (%)'],
+                    marker_color=colors,
+                    text=[f"{acv:.1f}%" for acv in shift_tebus['ACV TEBUS (%)']],
+                    textposition='outside'
+                ))
+                
+                fig_shift_tebus.add_hline(
+                    y=100, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text="Target (100%)"
+                )
+                
+                fig_shift_tebus.update_layout(
+                    template='plotly_white',
+                    height=350,
+                    showlegend=False,
+                    yaxis_title='ACV Tebus (%)',
+                    xaxis_title='Shift',
+                    title="Tebus Achievement by Shift"
+                )
+                
+                st.plotly_chart(fig_shift_tebus, use_container_width=True)
+            
+            # Tebus Performance by Day of Week
+            st.subheader("📅 Tebus Performance by Day of Week")
+            if 'HARI' in filtered_df.columns:
+                day_tebus = filtered_df.groupby('HARI').agg({
+                    'TARGET TEBUS 2500': 'sum',
+                    'ACTUAL TEBUS 2500': 'sum'
+                }).reset_index()
+                
+                day_tebus['ACV TEBUS (%)'] = (day_tebus['ACTUAL TEBUS 2500'] / day_tebus['TARGET TEBUS 2500'] * 100).fillna(0)
+                
+                # Define order for days
+                day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+                day_tebus['HARI'] = pd.Categorical(day_tebus['HARI'], categories=day_order, ordered=True)
+                day_tebus = day_tebus.sort_values('HARI')
+                
+                fig_day_tebus = go.Figure()
+                colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
+                         for acv in day_tebus['ACV TEBUS (%)']]
+                
+                fig_day_tebus.add_trace(go.Bar(
+                    x=day_tebus['HARI'],
+                    y=day_tebus['ACV TEBUS (%)'],
+                    marker_color=colors,
+                    text=[f"{acv:.1f}%" for acv in day_tebus['ACV TEBUS (%)']],
+                    textposition='outside'
+                ))
+                
+                fig_day_tebus.add_hline(
+                    y=100, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text="Target (100%)"
+                )
+                
+                fig_day_tebus.update_layout(
+                    template='plotly_white',
+                    height=350,
+                    showlegend=False,
+                    yaxis_title='ACV Tebus (%)',
+                    xaxis_title='Day of Week',
+                    title="Tebus Achievement by Day of Week"
+                )
+                
+                st.plotly_chart(fig_day_tebus, use_container_width=True)
+            
+            # Tebus Performance Trend
+            st.subheader("📈 Tebus Performance Trend")
+            if 'TANGGAL' in filtered_df.columns:
+                daily_tebus = filtered_df.groupby('TANGGAL').agg({
+                    'TARGET TEBUS 2500': 'sum',
+                    'ACTUAL TEBUS 2500': 'sum'
+                }).reset_index()
+                
+                daily_tebus['ACV TEBUS (%)'] = (daily_tebus['ACTUAL TEBUS 2500'] / daily_tebus['TARGET TEBUS 2500'] * 100).fillna(0)
+                daily_tebus = daily_tebus.sort_values('TANGGAL')
+                
+                fig_tebus_trend = go.Figure()
+                
+                # Add line for ACV trend
+                fig_tebus_trend.add_trace(go.Scatter(
+                    x=daily_tebus['TANGGAL'],
+                    y=daily_tebus['ACV TEBUS (%)'],
+                    mode='lines+markers',
+                    name='ACV Tebus (%)',
+                    line=dict(color='#10b981', width=3),
+                    marker=dict(size=8)
+                ))
+                
+                # Add target line
+                fig_tebus_trend.add_hline(
+                    y=100, 
+                    line_dash="dash", 
+                    line_color="red",
+                    annotation_text="Target (100%)"
+                )
+                
+                # Add shaded area for variation
+                fig_tebus_trend.add_trace(go.Scatter(
+                    x=daily_tebus['TANGGAL'],
+                    y=daily_tebus['ACV TEBUS (%)'],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ))
+                
+                fig_tebus_trend.add_trace(go.Scatter(
+                    x=daily_tebus['TANGGAL'],
+                    y=daily_tebus['ACV TEBUS (%)'],
+                    mode='lines',
+                    line=dict(width=0),
+                    fill='tonexty',
+                    fillcolor='rgba(16, 185, 129, 0.2)',
+                    name='Variation Range',
+                    showlegend=True
+                ))
+                
+                fig_tebus_trend.update_layout(
+                    template='plotly_white',
+                    height=400,
+                    showlegend=True,
+                    yaxis_title='ACV Tebus (%)',
+                    xaxis_title='Date',
+                    title="Tebus Performance Trend"
+                )
+                
+                st.plotly_chart(fig_tebus_trend, use_container_width=True)
+            
             # Tebus Performance Chart
+            st.subheader("📊 Tebus Performance by Cashier")
             if not tebus_summary.empty:
                 fig_tebus = go.Figure()
                 colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
@@ -1213,6 +1649,65 @@ def main():
                 )
                 
                 st.plotly_chart(fig_tebus, use_container_width=True)
+            
+            # Tebus Component Analysis
+            st.subheader("🎯 Tebus Component Analysis")
+            if 'NAMA KASIR' in filtered_df.columns:
+                # Calculate tebus components by cashier
+                tebus_components = filtered_df.groupby('NAMA KASIR').agg({
+                    'TARGET TEBUS 2500': 'sum',
+                    'ACTUAL TEBUS 2500': 'sum',
+                    'TOTAL SCORE PPSA': 'mean'
+                }).reset_index()
+                
+                tebus_components['ACV TEBUS (%)'] = (tebus_components['ACTUAL TEBUS 2500'] / tebus_components['TARGET TEBUS 2500'] * 100).fillna(0)
+                
+                # Create correlation scatter plot
+                fig_correlation = go.Figure()
+                
+                fig_correlation.add_trace(go.Scatter(
+                    x=tebus_components['TOTAL SCORE PPSA'],
+                    y=tebus_components['ACV TEBUS (%)'],
+                    mode='markers',
+                    name='PPSA Score vs Tebus ACV',
+                    marker=dict(
+                        size=12,
+                        color=tebus_components['ACV TEBUS (%)'],
+                        colorscale='Viridis',
+                        showscale=True,
+                        colorbar=dict(title="ACV Tebus (%)")
+                    ),
+                    text=tebus_components['NAMA KASIR'],
+                    textposition="top center"
+                ))
+                
+                # Add trend line
+                z = np.polyfit(tebus_components['TOTAL SCORE PPSA'], tebus_components['ACV TEBUS (%)'], 1)
+                p = np.poly1d(z)
+                x_trend = np.linspace(tebus_components['TOTAL SCORE PPSA'].min(), tebus_components['TOTAL SCORE PPSA'].max(), 100)
+                y_trend = p(x_trend)
+                
+                fig_correlation.add_trace(go.Scatter(
+                    x=x_trend,
+                    y=y_trend,
+                    mode='lines',
+                    name='Trend Line',
+                    line=dict(color='red', width=2, dash='dash')
+                ))
+                
+                fig_correlation.update_layout(
+                    template='plotly_white',
+                    height=400,
+                    xaxis_title='Total PPSA Score',
+                    yaxis_title='ACV Tebus (%)',
+                    title='Correlation: PPSA Score vs Tebus Performance'
+                )
+                
+                st.plotly_chart(fig_correlation, use_container_width=True)
+                
+                # Display correlation coefficient
+                correlation = tebus_components['TOTAL SCORE PPSA'].corr(tebus_components['ACV TEBUS (%)'])
+                st.info(f"📊 **Korelasi PPSA vs Tebus:** {correlation:.3f} ({'Positif Kuat' if correlation > 0.5 else 'Moderat' if correlation > 0.3 else 'Lemah' if correlation > 0 else 'Sangat Lemah'})")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2067,10 +2562,10 @@ def main():
                     card_class = "insight-card" if insight['type'] in ['success', 'info'] else "alert-card"
                     st.markdown(f"""
                     <div class="{card_class}">
-                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}">
+                        <div class="{'insight-title' if insight['type'] in ['success', 'info'] else 'alert-title'}>
                             {insight['title']}
                         </div>
-                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}">
+                        <div class="{'insight-text' if insight['type'] in ['success', 'info'] else 'insight-text'}>
                             {insight['text']}
                         </div>
                     </div>
