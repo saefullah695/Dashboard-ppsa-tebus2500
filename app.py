@@ -558,6 +558,9 @@ def process_data(df):
     score_cols = ['SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']
     df['TOTAL SCORE PPSA'] = df[score_cols].sum(axis=1)
     
+    # Remove rows with NaN in critical columns
+    df = df.dropna(subset=['SHIFT', 'TOTAL SCORE PPSA'])
+    
     return df
 
 def calculate_overall_ppsa_breakdown(df):
@@ -799,6 +802,9 @@ def calculate_shift_performance(df):
         'TOTAL SCORE PPSA_std': 'Score Std Dev',
         'TOTAL SCORE PPSA_count': 'Record Count',
     })
+    
+    # Remove any rows with NaN in SHIFT column
+    shift_performance = shift_performance.dropna(subset=['SHIFT'])
     
     # Sort by shift order: Shift 1 (Pagi), Shift 2 (Siang), Shift 3 (Malam)
     shift_order = ['Shift 1 (Pagi)', 'Shift 2 (Siang)', 'Shift 3 (Malam)']
@@ -2043,7 +2049,7 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab5:
-        # Performance Shift Tab
+        # Performance Shift Tab - PERBAIKAN LENGKAP
         st.markdown('<div class="content-container">', unsafe_allow_html=True)
         st.markdown('<h2 class="section-header">🕐 Performance Shift Analysis</h2>', unsafe_allow_html=True)
         
@@ -2057,8 +2063,12 @@ def main():
                 
                 col1, col2, col3 = st.columns(3)
                 
-                with col1:
+                # Best performing shift - handle potential NaN values
+                if not shift_performance['TOTAL SCORE PPSA'].isna().all():
                     best_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmax()]
+                    best_shift_name = best_shift['SHIFT'] if pd.notna(best_shift['SHIFT']) else "Unknown"
+                    best_shift_score = best_shift['TOTAL SCORE PPSA'] if pd.notna(best_shift['TOTAL SCORE PPSA']) else 0.0
+                    
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2066,16 +2076,35 @@ def main():
                             Best Performing Shift
                         </div>
                         <div class="metric-value" style="color: #10b981;">
-                            {best_shift['SHIFT']}
+                            {best_shift_name}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: {best_shift['TOTAL SCORE PPSA']:.1f}
+                            Total Score: {best_shift_score:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("trophy", size=20, color="#10b981")} 
+                            Best Performing Shift
+                        </div>
+                        <div class="metric-value" style="color: #10b981;">
+                            No Data
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Total Score: N/A
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                with col2:
+                # Worst performing shift - handle potential NaN values
+                if not shift_performance['TOTAL SCORE PPSA'].isna().all():
                     worst_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmin()]
+                    worst_shift_name = worst_shift['SHIFT'] if pd.notna(worst_shift['SHIFT']) else "Unknown"
+                    worst_shift_score = worst_shift['TOTAL SCORE PPSA'] if pd.notna(worst_shift['TOTAL SCORE PPSA']) else 0.0
+                    
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2083,16 +2112,35 @@ def main():
                             Needs Improvement
                         </div>
                         <div class="metric-value" style="color: #ef4444;">
-                            {worst_shift['SHIFT']}
+                            {worst_shift_name}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: {worst_shift['TOTAL SCORE PPSA']:.1f}
+                            Total Score: {worst_shift_score:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("alert", size=20, color="#ef4444")} 
+                            Needs Improvement
+                        </div>
+                        <div class="metric-value" style="color: #ef4444;">
+                            No Data
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Total Score: N/A
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                with col3:
+                # Most consistent shift - handle potential NaN values
+                if not shift_performance['Score Std Dev'].isna().all():
                     most_consistent_shift = shift_performance.loc[shift_performance['Score Std Dev'].idxmin()]
+                    most_consistent_name = most_consistent_shift['SHIFT'] if pd.notna(most_consistent_shift['SHIFT']) else "Unknown"
+                    most_consistent_std = most_consistent_shift['Score Std Dev'] if pd.notna(most_consistent_shift['Score Std Dev']) else 0.0
+                    
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">
@@ -2100,10 +2148,25 @@ def main():
                             Most Consistent
                         </div>
                         <div class="metric-value" style="color: #667eea;">
-                            {most_consistent_shift['SHIFT']}
+                            {most_consistent_name}
                         </div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Std Dev: {most_consistent_shift['Score Std Dev']:.1f}
+                            Std Dev: {most_consistent_std:.1f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">
+                            {get_svg_icon("insights", size=20, color="#667eea")} 
+                            Most Consistent
+                        </div>
+                        <div class="metric-value" style="color: #667eea;">
+                            No Data
+                        </div>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                            Std Dev: N/A
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -2111,118 +2174,136 @@ def main():
                 # Shift Performance Comparison Chart
                 st.subheader("📈 Shift Performance Comparison")
                 
-                fig_shift = go.Figure()
+                # Filter out NaN values for chart
+                chart_data = shift_performance.dropna(subset=['TOTAL SCORE PPSA', 'Median Score'])
                 
-                # Add bars for total score
-                fig_shift.add_trace(go.Bar(
-                    x=shift_performance['SHIFT'],
-                    y=shift_performance['TOTAL SCORE PPSA'],
-                    name='Total Score',
-                    marker_color=['#667eea', '#764ba2', '#f093fb'][:len(shift_performance)],
-                    text=[f"{score:.1f}" for score in shift_performance['TOTAL SCORE PPSA']],
-                    textposition='outside'
-                ))
-                
-                # Add line for median score
-                fig_shift.add_trace(go.Scatter(
-                    x=shift_performance['SHIFT'],
-                    y=shift_performance['Median Score'],
-                    mode='markers+lines',
-                    name='Median Score',
-                    marker=dict(size=10, color='#ef4444'),
-                    line=dict(color='#ef4444', width=2)
-                ))
-                
-                # Add target line
-                fig_shift.add_hline(
-                    y=100, 
-                    line_dash="dash", 
-                    line_color="red",
-                    annotation_text="Target (100)"
-                )
-                
-                fig_shift.update_layout(
-                    template='plotly_white',
-                    height=400,
-                    showlegend=True,
-                    yaxis_title='Score',
-                    xaxis_title='Shift',
-                    title="Performance Comparison by Shift"
-                )
-                
-                st.plotly_chart(fig_shift, use_container_width=True)
+                if not chart_data.empty:
+                    fig_shift = go.Figure()
+                    
+                    # Add bars for total score
+                    fig_shift.add_trace(go.Bar(
+                        x=chart_data['SHIFT'],
+                        y=chart_data['TOTAL SCORE PPSA'],
+                        name='Total Score',
+                        marker_color=['#667eea', '#764ba2', '#f093fb'][:len(chart_data)],
+                        text=[f"{score:.1f}" for score in chart_data['TOTAL SCORE PPSA']],
+                        textposition='outside'
+                    ))
+                    
+                    # Add line for median score
+                    fig_shift.add_trace(go.Scatter(
+                        x=chart_data['SHIFT'],
+                        y=chart_data['Median Score'],
+                        mode='markers+lines',
+                        name='Median Score',
+                        marker=dict(size=10, color='#ef4444'),
+                        line=dict(color='#ef4444', width=2)
+                    ))
+                    
+                    # Add target line
+                    fig_shift.add_hline(
+                        y=100, 
+                        line_dash="dash", 
+                        line_color="red",
+                        annotation_text="Target (100)"
+                    )
+                    
+                    fig_shift.update_layout(
+                        template='plotly_white',
+                        height=400,
+                        showlegend=True,
+                        yaxis_title='Score',
+                        xaxis_title='Shift',
+                        title="Performance Comparison by Shift"
+                    )
+                    
+                    st.plotly_chart(fig_shift, use_container_width=True)
+                else:
+                    st.warning("⚠️ Tidak ada data yang valid untuk ditampilkan dalam grafik.")
                 
                 # Component Performance by Shift
                 st.subheader("🎯 Component Performance by Shift")
                 
-                # Create a dataframe for component comparison
+                # Filter out NaN values for component chart
                 component_cols = ['SHIFT', 'SCORE PSM', 'SCORE PWP', 'SCORE SG', 'SCORE APC']
-                component_df = shift_performance[component_cols].melt(
-                    id_vars=['SHIFT'], 
-                    var_name='Component', 
-                    value_name='Score'
-                )
+                component_data = shift_performance.dropna(subset=component_cols)
                 
-                # Clean component names
-                component_df['Component'] = component_df['Component'].str.replace('SCORE ', '')
-                
-                fig_component = px.bar(
-                    component_df, 
-                    x='Component', 
-                    y='Score', 
-                    color='SHIFT',
-                    barmode='group',
-                    color_discrete_map={
-                        'Shift 1 (Pagi)': '#667eea', 
-                        'Shift 2 (Siang)': '#764ba2', 
-                        'Shift 3 (Malam)': '#f093fb'
-                    },
-                    title="Component Scores by Shift"
-                )
-                
-                fig_component.update_layout(
-                    template='plotly_white',
-                    height=400,
-                    yaxis_title='Score',
-                    xaxis_title='Component'
-                )
-                
-                st.plotly_chart(fig_component, use_container_width=True)
+                if not component_data.empty:
+                    # Create a dataframe for component comparison
+                    component_df = component_data[component_cols].melt(
+                        id_vars=['SHIFT'], 
+                        var_name='Component', 
+                        value_name='Score'
+                    )
+                    
+                    # Clean component names
+                    component_df['Component'] = component_df['Component'].str.replace('SCORE ', '')
+                    
+                    fig_component = px.bar(
+                        component_df, 
+                        x='Component', 
+                        y='Score', 
+                        color='SHIFT',
+                        barmode='group',
+                        color_discrete_map={
+                            'Shift 1 (Pagi)': '#667eea', 
+                            'Shift 2 (Siang)': '#764ba2', 
+                            'Shift 3 (Malam)': '#f093fb'
+                        },
+                        title="Component Scores by Shift"
+                    )
+                    
+                    fig_component.update_layout(
+                        template='plotly_white',
+                        height=400,
+                        yaxis_title='Score',
+                        xaxis_title='Component'
+                    )
+                    
+                    st.plotly_chart(fig_component, use_container_width=True)
+                else:
+                    st.warning("⚠️ Tidak ada data komponen yang valid untuk ditampilkan dalam grafik.")
                 
                 # Tebus Performance by Shift
                 if 'ACV TEBUS (%)' in shift_performance.columns:
                     st.subheader("🛒 Tebus Performance by Shift")
                     
-                    fig_tebus_shift = go.Figure()
+                    # Filter out NaN values for tebus chart
+                    tebus_data = shift_performance.dropna(subset=['ACV TEBUS (%)'])
                     
-                    colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
-                             for acv in shift_performance['ACV TEBUS (%)']]
-                    
-                    fig_tebus_shift.add_trace(go.Bar(
-                        x=shift_performance['SHIFT'],
-                        y=shift_performance['ACV TEBUS (%)'],
-                        marker_color=colors,
-                        text=[f"{acv:.1f}%" for acv in shift_performance['ACV TEBUS (%)']],
-                        textposition='outside'
-                    ))
-                    
-                    fig_tebus_shift.add_hline(
-                        y=100, 
-                        line_dash="dash", 
-                        line_color="red",
-                        annotation_text="Target (100%)"
-                    )
-                    
-                    fig_tebus_shift.update_layout(
-                        template='plotly_white',
-                        height=350,
-                        showlegend=False,
-                        yaxis_title='ACV Tebus (%)',
-                        xaxis_title='Shift',
-                        title="Tebus Achievement by Shift"
-                    )
-                    
-                    st.plotly_chart(fig_tebus_shift, use_container_width=True)
+                    if not tebus_data.empty:
+                        fig_tebus_shift = go.Figure()
+                        
+                        colors = ['#10b981' if acv >= 100 else '#f59e0b' if acv >= 80 else '#ef4444' 
+                                 for acv in tebus_data['ACV TEBUS (%)']]
+                        
+                        fig_tebus_shift.add_trace(go.Bar(
+                            x=tebus_data['SHIFT'],
+                            y=tebus_data['ACV TEBUS (%)'],
+                            marker_color=colors,
+                            text=[f"{acv:.1f}%" for acv in tebus_data['ACV TEBUS (%)']],
+                            textposition='outside'
+                        ))
+                        
+                        fig_tebus_shift.add_hline(
+                            y=100, 
+                            line_dash="dash", 
+                            line_color="red",
+                            annotation_text="Target (100%)"
+                        )
+                        
+                        fig_tebus_shift.update_layout(
+                            template='plotly_white',
+                            height=350,
+                            showlegend=False,
+                            yaxis_title='ACV Tebus (%)',
+                            xaxis_title='Shift',
+                            title="Tebus Achievement by Shift"
+                        )
+                        
+                        st.plotly_chart(fig_tebus_shift, use_container_width=True)
+                    else:
+                        st.warning("⚠️ Tidak ada data Tebus yang valid untuk ditampilkan dalam grafik.")
                 
                 # Detailed Shift Performance Table
                 st.subheader("📋 Detailed Shift Performance")
@@ -2232,10 +2313,10 @@ def main():
                 
                 # Add performance categories
                 display_shift_df['Performance Category'] = display_shift_df['TOTAL SCORE PPSA'].apply(
-                    lambda x: "🏆 Excellent" if x >= 120 else
-                             "⭐ Good" if x >= 100 else
-                             "⚠️ Needs Improvement" if x >= 80 else
-                             "🚨 Critical"
+                    lambda x: "🏆 Excellent" if pd.notna(x) and x >= 120 else
+                             "⭐ Good" if pd.notna(x) and x >= 100 else
+                             "⚠️ Needs Improvement" if pd.notna(x) and x >= 80 else
+                             "🚨 Critical" if pd.notna(x) else "📊 No Data"
                 )
                 
                 # Select columns to display
@@ -2272,37 +2353,58 @@ def main():
                 # Generate insights
                 shift_insights = []
                 
-                # Best performing shift
-                best_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmax()]
-                shift_insights.append({
-                    'type': 'success',
-                    'title': f'🏆 Best Performing Shift: {best_shift["SHIFT"]}',
-                    'text': f"Dengan total score {best_shift['TOTAL SCORE PPSA']:.1f} dan median {best_shift['Median Score']:.1f}"
-                })
+                # Best performing shift - handle potential NaN values
+                if not shift_performance['TOTAL SCORE PPSA'].isna().all():
+                    best_shift = shift_performance.loc[shift_performance['TOTAL SCORE PPSA'].idxmax()]
+                    best_shift_name = best_shift['SHIFT'] if pd.notna(best_shift['SHIFT']) else "Unknown"
+                    best_shift_score = best_shift['TOTAL SCORE PPSA'] if pd.notna(best_shift['TOTAL SCORE PPSA']) else 0.0
+                    best_shift_median = best_shift['Median Score'] if pd.notna(best_shift['Median Score']) else 0.0
+                    
+                    shift_insights.append({
+                        'type': 'success',
+                        'title': f'🏆 Best Performing Shift: {best_shift_name}',
+                        'text': f"Dengan total score {best_shift_score:.1f} dan median {best_shift_median:.1f}"
+                    })
+                else:
+                    shift_insights.append({
+                        'type': 'warning',
+                        'title': '📊 No Shift Data Available',
+                        'text': "Tidak ada data shift yang valid untuk dianalisis"
+                    })
                 
-                # Most consistent shift
-                most_consistent = shift_performance.loc[shift_performance['Score Std Dev'].idxmin()]
-                shift_insights.append({
-                    'type': 'info',
-                    'title': f'🎯 Most Consistent Shift: {most_consistent["SHIFT"]}',
-                    'text': f"Dengan standar deviasi terendah ({most_consistent['Score Std Dev']:.1f})"
-                })
+                # Most consistent shift - handle potential NaN values
+                if not shift_performance['Score Std Dev'].isna().all():
+                    most_consistent = shift_performance.loc[shift_performance['Score Std Dev'].idxmin()]
+                    most_consistent_name = most_consistent['SHIFT'] if pd.notna(most_consistent['SHIFT']) else "Unknown"
+                    most_consistent_std = most_consistent['Score Std Dev'] if pd.notna(most_consistent['Score Std Dev']) else 0.0
+                    
+                    shift_insights.append({
+                        'type': 'info',
+                        'title': f'🎯 Most Consistent Shift: {most_consistent_name}',
+                        'text': f"Dengan standar deviasi terendah ({most_consistent_std:.1f})"
+                    })
                 
-                # Tebus performance
-                if 'ACV TEBUS (%)' in shift_performance.columns:
+                # Tebus performance - handle potential NaN values
+                if 'ACV TEBUS (%)' in shift_performance.columns and not shift_performance['ACV TEBUS (%)'].isna().all():
                     best_tebus = shift_performance.loc[shift_performance['ACV TEBUS (%)'].idxmax()]
-                    if best_tebus['ACV TEBUS (%)'] >= 100:
+                    best_tebus_name = best_tebus['SHIFT'] if pd.notna(best_tebus['SHIFT']) else "Unknown"
+                    best_tebus_acv = best_tebus['ACV TEBUS (%)'] if pd.notna(best_tebus['ACV TEBUS (%)']) else 0.0
+                    
+                    if best_tebus_acv >= 100:
                         shift_insights.append({
                             'type': 'success',
-                            'title': f'🛒 Best Tebus Performance: {best_tebus["SHIFT"]}',
-                            'text': f"Mencapai {best_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                            'title': f'🛒 Best Tebus Performance: {best_tebus_name}',
+                            'text': f"Mencapai {best_tebus_acv:.1f}% dari target"
                         })
                     else:
                         worst_tebus = shift_performance.loc[shift_performance['ACV TEBUS (%)'].idxmin()]
+                        worst_tebus_name = worst_tebus['SHIFT'] if pd.notna(worst_tebus['SHIFT']) else "Unknown"
+                        worst_tebus_acv = worst_tebus['ACV TEBUS (%)'] if pd.notna(worst_tebus['ACV TEBUS (%)']) else 0.0
+                        
                         shift_insights.append({
                             'type': 'warning',
-                            'title': f'⚠️ Tebus Performance Needs Improvement: {worst_tebus["SHIFT"]}',
-                            'text': f"Hanya mencapai {worst_tebus['ACV TEBUS (%)']:.1f}% dari target"
+                            'title': f'⚠️ Tebus Performance Needs Improvement: {worst_tebus_name}',
+                            'text': f"Hanya mencapai {worst_tebus_acv:.1f}% dari target"
                         })
                 
                 # Display insights
