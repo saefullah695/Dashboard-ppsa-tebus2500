@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
+import pytz
 warnings.filterwarnings('ignore')
 
 # --- KONFIGURASI HALAMAN ---
@@ -17,6 +18,111 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- FUNGSI UNTUK FITUR BARU ---
+def get_current_time():
+    """Mendapatkan waktu saat ini dalam timezone Jakarta (WIB)"""
+    jakarta_tz = pytz.timezone('Asia/Jakarta')
+    return datetime.now(jakarta_tz)
+
+def format_last_update():
+    """Format waktu terakhir update"""
+    current_time = get_current_time()
+    date_str = current_time.strftime("%d %b %Y")  # "25 Okt 2025"
+    time_str = current_time.strftime("%H:%M:%S WIB")  # "14:30:45 WIB"
+    return date_str, time_str
+
+def create_refresh_button():
+    """Membuat tombol refresh dengan styling gradient"""
+    st.markdown("""
+    <style>
+    .refresh-button-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 1rem;
+    }
+    .refresh-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .refresh-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    }
+    .last-update-box {
+        background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,249,255,0.95) 100%);
+        backdrop-filter: blur(20px);
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        text-align: center;
+        min-width: 180px;
+        margin-bottom: 1rem;
+    }
+    .last-update-date {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #667eea;
+        margin-bottom: 0.25rem;
+    }
+    .last-update-time {
+        font-size: 0.8rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .sidebar-update-info {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        padding: 0.75rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border-left: 3px solid #667eea;
+    }
+    .sidebar-update-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    .sidebar-update-value {
+        font-size: 0.8rem;
+        color: #1e293b;
+        font-weight: 700;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Container untuk header dengan tombol refresh dan info update
+    col1, col2 = st.columns([1, 1])
+    
+    with col2:
+        # Box info terakhir update
+        date_str, time_str = format_last_update()
+        st.markdown(f"""
+        <div class="last-update-box">
+            <div class="last-update-date">🕐 {date_str}</div>
+            <div class="last-update-time">{time_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Tombol refresh
+        st.markdown('<div class="refresh-button-container">', unsafe_allow_html=True)
+        if st.button("🔄 Refresh Data", key="refresh_button"):
+            st.cache_data.clear()
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- FUNGSI HELPER UNTUK SVG ICON ---
 def get_svg_icon(icon_name, size=24, color="#667eea"):
@@ -1080,6 +1186,9 @@ def calculate_tebus_insights(df):
 
 # --- MAIN DASHBOARD ---
 def main():
+    # Tambahkan tombol refresh dan info update di header
+    create_refresh_button()
+    
     # Dashboard Header - PERBAIKAN: Tambahkan nama toko
     st.markdown(f"""
     <div class="dashboard-header">
@@ -1108,8 +1217,18 @@ def main():
 
     processed_df = process_data(raw_df.copy())
     
-    # Sidebar filters
+    # Sidebar filters - TAMBAHKAN INFO UPDATE DI SIDEBAR
     with st.sidebar:
+        # Info terakhir update di sidebar
+        date_str, time_str = format_last_update()
+        st.markdown(f"""
+        <div class="sidebar-update-info">
+            <div class="sidebar-update-label">🕐 Terakhir Update</div>
+            <div class="sidebar-update-value">{date_str}</div>
+            <div class="sidebar-update-value">{time_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("### ⚙️ Filter & Pengaturan")
         
         # Cashier filter
@@ -1168,9 +1287,14 @@ def main():
             help="Threshold untuk mengidentifikasi performa"
         )
         
-        # Summary info
+        # Summary info - TAMBAHKAN INFO UPDATE DI RINGKASAN
         st.markdown("---")
         st.markdown("### 📊 Ringkasan Data")
+        
+        # Tambahkan info update timestamp kecil
+        _, time_str = format_last_update()
+        st.caption(f"Terakhir update: {time_str}")
+        
         st.info(f"""
         **Total Records:** {len(filtered_df):,}  
         **Kasir Terpilih:** {len(selected_cashiers)}  
