@@ -1519,7 +1519,7 @@ def main():
                 yaxis_title='Score',
                 title_x=0.5
             )
-            st.plotly_chart(fig_vs_target, use_container_width=True)
+            st.plotly_chart(fig_vs_target, use_container_width=True, key="ppsa_component_target")
         
         with col_chart2:
             st.subheader("📈 Performance Distribution")
@@ -1544,7 +1544,7 @@ def main():
                     yaxis_title='Frequency',
                     showlegend=False
                 )
-                st.plotly_chart(fig_dist, use_container_width=True)
+                st.plotly_chart(fig_dist, use_container_width=True, key="ppsa_performance_dist")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1578,7 +1578,8 @@ def main():
                     'SCORE APC': st.column_config.NumberColumn("APC", format="%.1f", width="small"),
                     'CONSISTENCY': st.column_config.NumberColumn("Consistency", format="%.1f", width="small"),
                 },
-                hide_index=True
+                hide_index=True,
+                key="ppsa_detailed_table"
             )
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1684,7 +1685,7 @@ def main():
                     title="Tebus Achievement by Shift"
                 )
                 
-                st.plotly_chart(fig_shift_tebus, use_container_width=True)
+                st.plotly_chart(fig_shift_tebus, use_container_width=True, key="tebus_shift_chart")
             
             # Tebus Performance by Day of Week
             st.subheader("📅 Tebus Performance by Day of Week")
@@ -1729,7 +1730,7 @@ def main():
                     title="Tebus Achievement by Day of Week"
                 )
                 
-                st.plotly_chart(fig_day_tebus, use_container_width=True)
+                st.plotly_chart(fig_day_tebus, use_container_width=True, key="tebus_day_chart")
             
             # Tebus Performance Trend
             st.subheader("📈 Tebus Performance Trend")
@@ -1791,7 +1792,7 @@ def main():
                     title="Tebus Performance Trend"
                 )
                 
-                st.plotly_chart(fig_tebus_trend, use_container_width=True)
+                st.plotly_chart(fig_tebus_trend, use_container_width=True, key="tebus_trend_chart")
             
             # Tebus Performance Chart
             st.subheader("📊 Tebus Performance by Cashier")
@@ -1820,7 +1821,7 @@ def main():
                     title="Tebus Performance by Cashier"
                 )
                 
-                st.plotly_chart(fig_tebus, use_container_width=True)
+                st.plotly_chart(fig_tebus, use_container_width=True, key="tebus_cashier_chart")
             
             # Tebus Component Analysis
             st.subheader("🎯 Tebus Component Analysis")
@@ -1875,7 +1876,7 @@ def main():
                     title='Correlation: PPSA Score vs Tebus Performance'
                 )
                 
-                st.plotly_chart(fig_correlation, use_container_width=True)
+                st.plotly_chart(fig_correlation, use_container_width=True, key="tebus_correlation_chart")
                 
                 # Display correlation coefficient
                 correlation = tebus_components['TOTAL SCORE PPSA'].corr(tebus_components['ACV TEBUS (%)'])
@@ -1911,7 +1912,7 @@ def main():
                 title="Correlation Matrix - PPSA Components"
             )
             
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(fig_corr, use_container_width=True, key="insights_correlation_matrix")
             
             # Interpretation
             st.info("""
@@ -1995,7 +1996,7 @@ def main():
                 showlegend=True
             )
             
-            st.plotly_chart(fig_timeseries, use_container_width=True)
+            st.plotly_chart(fig_timeseries, use_container_width=True, key="insights_timeseries")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2065,7 +2066,7 @@ def main():
         # Action Plan Generator
         st.subheader("🎯 Automated Action Plan")
         
-        if st.button("Generate Action Plan", type="primary"):
+        if st.button("Generate Action Plan", type="primary", key="alert_action_plan_btn"):
             action_plan = []
             
             overall_scores = calculate_overall_ppsa_breakdown(filtered_df)
@@ -2126,35 +2127,37 @@ def main():
                     best_shift_name = best_shift['SHIFT'] if pd.notna(best_shift['SHIFT']) else "Unknown"
                     best_shift_score = best_shift['TOTAL SCORE PPSA'] if pd.notna(best_shift['TOTAL SCORE PPSA']) else 0.0
                     
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("trophy", size=20, color="#10b981")} 
-                            Best Performing Shift
+                    with col1:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("trophy", size=20, color="#10b981")} 
+                                Best Performing Shift
+                            </div>
+                            <div class="metric-value" style="color: #10b981;">
+                                {best_shift_name}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Total Score: {best_shift_score:.1f}
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #10b981;">
-                            {best_shift_name}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: {best_shift_score:.1f}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("trophy", size=20, color="#10b981")} 
-                            Best Performing Shift
+                    with col1:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("trophy", size=20, color="#10b981")} 
+                                Best Performing Shift
+                            </div>
+                            <div class="metric-value" style="color: #10b981;">
+                                No Data
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Total Score: N/A
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #10b981;">
-                            No Data
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: N/A
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 
                 # Worst performing shift - handle potential NaN values
                 if not shift_performance['TOTAL SCORE PPSA'].isna().all():
@@ -2162,35 +2165,37 @@ def main():
                     worst_shift_name = worst_shift['SHIFT'] if pd.notna(worst_shift['SHIFT']) else "Unknown"
                     worst_shift_score = worst_shift['TOTAL SCORE PPSA'] if pd.notna(worst_shift['TOTAL SCORE PPSA']) else 0.0
                     
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("alert", size=20, color="#ef4444")} 
-                            Needs Improvement
+                    with col2:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("alert", size=20, color="#ef4444")} 
+                                Needs Improvement
+                            </div>
+                            <div class="metric-value" style="color: #ef4444;">
+                                {worst_shift_name}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Total Score: {worst_shift_score:.1f}
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #ef4444;">
-                            {worst_shift_name}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: {worst_shift_score:.1f}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("alert", size=20, color="#ef4444")} 
-                            Needs Improvement
+                    with col2:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("alert", size=20, color="#ef4444")} 
+                                Needs Improvement
+                            </div>
+                            <div class="metric-value" style="color: #ef4444;">
+                                No Data
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Total Score: N/A
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #ef4444;">
-                            No Data
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Total Score: N/A
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 
                 # Most consistent shift - handle potential NaN values
                 if not shift_performance['Score Std Dev'].isna().all():
@@ -2198,35 +2203,37 @@ def main():
                     most_consistent_name = most_consistent_shift['SHIFT'] if pd.notna(most_consistent_shift['SHIFT']) else "Unknown"
                     most_consistent_std = most_consistent_shift['Score Std Dev'] if pd.notna(most_consistent_shift['Score Std Dev']) else 0.0
                     
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("insights", size=20, color="#667eea")} 
-                            Most Consistent
+                    with col3:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("insights", size=20, color="#667eea")} 
+                                Most Consistent
+                            </div>
+                            <div class="metric-value" style="color: #667eea;">
+                                {most_consistent_name}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Std Dev: {most_consistent_std:.1f}
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #667eea;">
-                            {most_consistent_name}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Std Dev: {most_consistent_std:.1f}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">
-                            {get_svg_icon("insights", size=20, color="#667eea")} 
-                            Most Consistent
+                    with col3:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div class="metric-label">
+                                {get_svg_icon("insights", size=20, color="#667eea")} 
+                                Most Consistent
+                            </div>
+                            <div class="metric-value" style="color: #667eea;">
+                                No Data
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
+                                Std Dev: N/A
+                            </div>
                         </div>
-                        <div class="metric-value" style="color: #667eea;">
-                            No Data
-                        </div>
-                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">
-                            Std Dev: N/A
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                 
                 # Shift Performance Comparison Chart
                 st.subheader("📈 Shift Performance Comparison")
@@ -2274,7 +2281,7 @@ def main():
                         title="Performance Comparison by Shift"
                     )
                     
-                    st.plotly_chart(fig_shift, use_container_width=True)
+                    st.plotly_chart(fig_shift, use_container_width=True, key="shift_comparison_chart")
                 else:
                     st.warning("⚠️ Tidak ada data yang valid untuk ditampilkan dalam grafik.")
                 
@@ -2317,7 +2324,7 @@ def main():
                         xaxis_title='Component'
                     )
                     
-                    st.plotly_chart(fig_component, use_container_width=True)
+                    st.plotly_chart(fig_component, use_container_width=True, key="shift_component_chart")
                 else:
                     st.warning("⚠️ Tidak ada data komponen yang valid untuk ditampilkan dalam grafik.")
                 
@@ -2358,7 +2365,7 @@ def main():
                             title="Tebus Achievement by Shift"
                         )
                         
-                        st.plotly_chart(fig_tebus_shift, use_container_width=True)
+                        st.plotly_chart(fig_tebus_shift, use_container_width=True, key="shift_tebus_chart")
                     else:
                         st.warning("⚠️ Tidak ada data Tebus yang valid untuk ditampilkan dalam grafik.")
                 
@@ -2405,7 +2412,8 @@ def main():
                         'ACV TEBUS FORMATTED': st.column_config.TextColumn("Tebus ACV", width="small"),  # PERBAIKAN: Gunakan TextColumn
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
-                    hide_index=True
+                    hide_index=True,
+                    key="shift_detailed_table"
                 )
                 
                 # Shift Performance Insights
@@ -2616,7 +2624,7 @@ def main():
                     title="Daily Performance Trend with Standard Deviation"
                 )
                 
-                st.plotly_chart(fig_daily, use_container_width=True)
+                st.plotly_chart(fig_daily, use_container_width=True, key="daily_trend_chart")
                 
                 # Day of Week Performance
                 day_performance = calculate_day_of_week_performance(filtered_df)
@@ -2653,7 +2661,7 @@ def main():
                         title="Performance by Day of Week"
                     )
                     
-                    st.plotly_chart(fig_day_week, use_container_width=True)
+                    st.plotly_chart(fig_day_week, use_container_width=True, key="day_week_chart")
                     
                     # Component Performance by Day of Week
                     st.subheader("🎯 Component Performance by Day of Week")
@@ -2691,7 +2699,7 @@ def main():
                         xaxis_title='Day of Week'
                     )
                     
-                    st.plotly_chart(fig_component_day, use_container_width=True)
+                    st.plotly_chart(fig_component_day, use_container_width=True, key="component_day_chart")
                 
                 # Tebus Performance by Day
                 if 'ACV TEBUS (%)' in daily_performance.columns:
@@ -2726,7 +2734,7 @@ def main():
                         title="Tebus Achievement by Day"
                     )
                     
-                    st.plotly_chart(fig_tebus_daily, use_container_width=True)
+                    st.plotly_chart(fig_tebus_daily, use_container_width=True, key="tebus_daily_chart")
                 
                 # Detailed Daily Performance Table
                 st.subheader("📋 Detailed Daily Performance")
@@ -2775,7 +2783,8 @@ def main():
                         'ACV TEBUS FORMATTED': st.column_config.TextColumn("Tebus ACV", width="small"),  # PERBAIKAN: Gunakan TextColumn
                         'Record Count': st.column_config.NumberColumn("Records", width="small"),
                     },
-                    hide_index=True
+                    hide_index=True,
+                    key="daily_detailed_table"
                 )
                 
                 # Daily Performance Insights
